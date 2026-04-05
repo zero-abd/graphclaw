@@ -94,10 +94,6 @@ def _current_commit() -> str:
 
 
 def _tracked_upstream() -> str:
-    branch = _current_branch()
-    result = _git(["rev-parse", f"origin/{branch}"], check=False)
-    if result.returncode == 0:
-        return f"origin/{branch}"
     return "origin/main"
 
 
@@ -169,7 +165,7 @@ def perform_update() -> dict[str, Any]:
     previous_branch = status["branch"]
     upstream = status["upstream"]
 
-    _git(["checkout", previous_branch], check=False)
+    _git(["checkout", "-B", "main", upstream])
     _git(["reset", "--hard", upstream])
     _reinstall_package()
 
