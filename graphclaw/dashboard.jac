@@ -27,15 +27,27 @@ obj OverviewResponse {
     has session_count: int = 0;
     has memory_count: int = 0;
     has skill_count: int = 0;
+    has native_skill_count: int = 0;
+    has workflow_skill_count: int = 0;
+    has workspace_skill_count: int = 0;
+    has shared_skill_count: int = 0;
+    has bundled_skill_count: int = 0;
+    has managed_skill_count: int = 0;
+    has assistant_identity: str = "";
+    has assistant_soul: str = "";
+    has root_ready: bool = False;
     has channel_summary: list[str] = [];
     has recent_session_labels: list[str] = [];
     has skill_labels: list[str] = [];
+    has skill_inventory_labels: list[str] = [];
 }
 
 obj MemoryNodeView {
     has id: str = "";
     has kind: str = "node";
     has label: str = "";
+    has system_key: str = "";
+    has topics: list[str] = [];
 }
 
 obj MemoryEdgeView {
@@ -49,8 +61,10 @@ obj MemoryResponse {
     has profile_json: str = "{}";
     has node_count: int = 0;
     has edge_count: int = 0;
+    has core_edge_count: int = 0;
     has nodes: list[MemoryNodeView] = [];
     has edges: list[MemoryEdgeView] = [];
+    has core_node_labels: list[str] = [];
 }
 
 obj DashboardSaveResponse {
@@ -62,14 +76,57 @@ obj DashboardSaveResponse {
 def:pub dashboard_overview() -> OverviewResponse {
     response = OverviewResponse();
     ::py::
+    from pathlib import Path
+
     cfg = load_config(force_reload=True)
     sessions = list_sessions()
     memories = list(_iter_live_memories())
     skills = list_skills()
     update_status = get_update_status(fetch=False)
+    profile = get_profile()
+
+    workspace_skills_root = Path(cfg.workspace) / "skills"
+    shared_skills_root = Path.home() / ".graphclaw" / "skills"
+    native_skill_count = 0
+    workflow_skill_count = 0
+    workspace_skill_count = 0
+    shared_skill_count = 0
+    bundled_skill_count = 0
+    managed_skill_count = 0
+    skill_inventory_labels = []
+    for skill in skills:
+        skill_type = str(skill.get("type", "skill"))
+        if skill_type == "native":
+            native_skill_count += 1
+        else:
+            workflow_skill_count += 1
+
+        source = str(skill.get("source", "local"))
+        path_text = str(skill.get("path", ""))
+        path = Path(path_text) if path_text else None
+        location = "workspace"
+        if source == "bundled":
+            bundled_skill_count += 1
+            location = "bundled"
+        elif source in {"clawhub", "git"}:
+            managed_skill_count += 1
+        if path and str(path).startswith(str(shared_skills_root)):
+            shared_skill_count += 1
+            location = "shared"
+        elif path and str(path).startswith(str(workspace_skills_root)):
+            workspace_skill_count += 1
+            location = "workspace"
+        elif source == "bundled":
+            location = "bundled"
+        skill_inventory_labels.append(
+            f"{skill.get('slug', 'skill')} · {skill_type} · {source} · {location}"
+        )
 
     response.version = __version__
     response.assistant_name = get_assistant_name()
+    response.assistant_identity = str(profile.get("identity", ""))
+    response.assistant_soul = str(profile.get("soul", ""))
+    response.root_ready = bool(profile.get("root_memory_id"))
     response.workspace = cfg.workspace
     response.default_model = cfg.agents.model
     response.default_provider = str(cfg.providers.get("default_provider", "openrouter"))
@@ -81,6 +138,12 @@ def:pub dashboard_overview() -> OverviewResponse {
     response.session_count = len(sessions)
     response.memory_count = len(memories)
     response.skill_count = len(skills)
+    response.native_skill_count = native_skill_count
+    response.workflow_skill_count = workflow_skill_count
+    response.workspace_skill_count = workspace_skill_count
+    response.shared_skill_count = shared_skill_count
+    response.bundled_skill_count = bundled_skill_count
+    response.managed_skill_count = managed_skill_count
     response.channel_summary = [
         f"{name}: {'enabled' if bool(entry.get('enabled')) else 'disabled'}"
         for name, entry in cfg.channels.items()
@@ -90,9 +153,10 @@ def:pub dashboard_overview() -> OverviewResponse {
         for session in sessions[-8:]
     ]
     response.skill_labels = [
-        f"{skill.get('name', skill.get('slug', 'skill'))} · {skill.get('type', '')}"
+        f"{skill.get('name', skill.get('slug', 'skill'))} · {skill.get('type', '')} · {skill.get('source', '')}"
         for skill in skills[:12]
     ]
+    response.skill_inventory_labels = skill_inventory_labels[:24]
     ::py::
     return response;
 }
@@ -106,6 +170,7 @@ def:pub dashboard_memory() -> MemoryResponse {
     memories = _load_memories()[:200]
     sessions = list_sessions()[:50]
     profile = get_profile()
+    core_node_ids = set()
 
     response.assistant_name = get_assistant_name()
     response.profile_json = json.dumps(profile, indent=2) if profile else "{}"
@@ -115,11 +180,26 @@ def:pub dashboard_memory() -> MemoryResponse {
 
     for memory in memories:
         memory_id = str(memory.get("id", ""))
-        response.nodes.append(MemoryNodeView(id=memory_id, kind="memory", label=str(memory.get("content", ""))[:80]))
+        topics = [str(topic) for topic in (memory.get("topics", []) or [])]
+        system_key = str(memory.get("system_key", ""))
+        response.nodes.append(
+            MemoryNodeView(
+                id=memory_id,
+                kind="memory",
+                label=str(memory.get("content", ""))[:80],
+                system_key=system_key,
+                topics=topics,
+            )
+        )
+        if system_key.startswith("assistant_"):
+            core_node_ids.add(memory_id)
+            response.core_node_labels.append(str(memory.get("content", ""))[:80])
         for relation in memory.get("relationships", []) or []:
             target = relation.get("to")
             if target:
                 response.edges.append(MemoryEdgeView(source=memory_id, target=str(target), label=str(relation.get("relationship", "related_to"))))
+                if memory_id in core_node_ids:
+                    response.core_edge_count += 1
 
     for session in sessions:
         session_id = str(session.get("session_id", ""))

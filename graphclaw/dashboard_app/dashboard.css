@@ -53,7 +53,22 @@ body {
 .node-card { border-radius: 18px; padding: 14px; border: 1px solid var(--line); background: rgba(15, 23, 42, 0.78); }
 .node-kind { font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: #93c5fd; }
 .node-title { margin-top: 10px; font-size: 14px; font-weight: 600; }
+.graph-shell { display: grid; gap: 16px; }
+.graph-toolbar { display: flex; justify-content: flex-end; }
+.graph-refresh { padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line-strong); background: rgba(56, 189, 248, 0.12); color: var(--text); font-weight: 600; cursor: pointer; }
+.graph-refresh:hover { background: rgba(56, 189, 248, 0.22); }
+.graph-canvas { min-height: 460px; border-radius: 22px; border: 1px solid var(--line); background: radial-gradient(circle at center, rgba(56, 189, 248, 0.08), rgba(2, 6, 23, 0.92)); overflow: hidden; }
+.graph-svg { width: 100%; height: 460px; display: block; }
+.graph-edge { stroke: rgba(125, 211, 252, 0.35); stroke-width: 0.35; }
+.graph-node circle { fill: rgba(30, 41, 59, 0.95); stroke: rgba(148, 163, 184, 0.4); stroke-width: 0.35; }
+.graph-node text { fill: var(--text); font-size: 3.2px; text-anchor: middle; font-weight: 600; paint-order: stroke; stroke: rgba(2, 6, 23, 0.95); stroke-width: 0.9px; }
+.graph-node.root circle { fill: rgba(56, 189, 248, 0.85); stroke: rgba(186, 230, 253, 0.95); }
+.graph-node.core circle { fill: rgba(139, 92, 246, 0.78); stroke: rgba(221, 214, 254, 0.95); }
+.graph-node.session circle { fill: rgba(34, 197, 94, 0.7); stroke: rgba(187, 247, 208, 0.95); }
+.graph-node.turn circle { fill: rgba(251, 191, 36, 0.72); stroke: rgba(254, 240, 138, 0.95); }
+.graph-node.memory circle { fill: rgba(15, 118, 110, 0.78); stroke: rgba(153, 246, 228, 0.95); }
+.graph-legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .edge-list { display: grid; gap: 10px; max-height: 420px; overflow: auto; }
 .edge-item { border-radius: 16px; border: 1px solid var(--line); padding: 12px 14px; background: rgba(2, 6, 23, 0.5); font-size: 13px; }
 .textarea { display: block; width: 100%; min-height: 140px; border-radius: 16px; border: 1px solid rgba(148, 163, 184, 0.18); background: rgba(2, 6, 23, 0.75); color: var(--text); padding: 12px 14px; white-space: pre-wrap; }
-@media (max-width: 1120px) { .dashboard-shell, .layout-grid, .memory-grid, .stats-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1120px) { .dashboard-shell, .layout-grid, .memory-grid, .stats-grid, .graph-legend { grid-template-columns: 1fr; } }

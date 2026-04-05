@@ -1,4 +1,5 @@
 import "./dashboard.css";
+cl import from "./graph_helpers.js" { GraphMemoryCanvas, fetchDashboardMemory }
 sv import from graphclaw.dashboard { dashboard_memory, dashboard_overview, OverviewResponse, MemoryResponse }
 
 
@@ -52,7 +53,7 @@ def OverviewContent(overview: OverviewResponse) -> JsxElement {
         <div className="stats-grid">
             <StatCard title="Memory" value={str(overview.memory_count)} meta="Live persisted memories" tone="info"/>
             <StatCard title="Sessions" value={str(overview.session_count)} meta="Tracked chat sessions" tone="good"/>
-            <StatCard title="Skills" value={str(overview.skill_count)} meta="Installed runtime skills" tone="warn"/>
+            <StatCard title="Skills" value={str(overview.skill_count)} meta={str(overview.native_skill_count) + " native · " + str(overview.workflow_skill_count) + " workflow"} tone="warn"/>
             <StatCard title="Provider" value={overview.default_provider} meta={overview.default_model} tone="info"/>
         </div>
 
@@ -65,6 +66,14 @@ def OverviewContent(overview: OverviewResponse) -> JsxElement {
                             Current commit: {overview.current_commit}<br/>
                             Latest main: {overview.latest_commit}
                         </div>
+                    </div>
+                }/>
+                <SectionCard title="Identity Core" subtitle="Seeded assistant state available before the first conversation" body={
+                    <div className="list-grid">
+                        <div className="list-item"><div className="list-item-title">Name</div><div className="list-item-meta">{overview.assistant_name}</div></div>
+                        <div className="list-item"><div className="list-item-title">Identity</div><div className="list-item-meta">{overview.assistant_identity}</div></div>
+                        <div className="list-item"><div className="list-item-title">Soul</div><div className="list-item-meta">{overview.assistant_soul}</div></div>
+                        <div className="list-item"><div className="list-item-title">Root graph</div><div className="list-item-meta">{overview.root_ready and "ready" or "missing"}</div></div>
                     </div>
                 }/>
             </div>
@@ -144,12 +153,68 @@ def ChannelsContent(overview: OverviewResponse) -> JsxElement {
                         <div className="list-item"><div className="list-item-title">Default model</div><div className="list-item-meta">{overview.default_model}</div></div>
                     </div>
                 }/>
-                <SectionCard title="Skills Snapshot" subtitle="Installed runtime skills visible to the operator" body={
+                <SectionCard title="Identity Snapshot" subtitle="Core personality and root-memory status" body={
                     <div className="list-grid">
-                        {[<div key={label} className="list-item"><div className="list-item-title">{label}</div></div> for label in overview.skill_labels]}
+                        <div className="list-item"><div className="list-item-title">Identity</div><div className="list-item-meta">{overview.assistant_identity}</div></div>
+                        <div className="list-item"><div className="list-item-title">Soul</div><div className="list-item-meta">{overview.assistant_soul}</div></div>
+                        <div className="list-item"><div className="list-item-title">Root graph</div><div className="list-item-meta">{overview.root_ready and "ready" or "missing"}</div></div>
                     </div>
                 }/>
             </div>
+        </div>
+    </div>;
+}
+
+
+def SkillsContent(overview: OverviewResponse) -> JsxElement {
+    return <div className="stack">
+        <div className="page-header">
+            <div>
+                <h1>Skills</h1>
+                <p>Track workspace, shared, bundled, and managed skills with the same operator-first emphasis OpenClaw gives to tool and skill visibility.</p>
+            </div>
+            <div className="header-actions">
+                <StatusPill text={str(overview.skill_count) + " total"} tone="warn"/>
+                <StatusPill text={str(overview.workflow_skill_count) + " workflow"} tone="info"/>
+            </div>
+        </div>
+        <div className="stats-grid">
+            <StatCard title="Native" value={str(overview.native_skill_count)} meta="Typed Python/native skills" tone="good"/>
+            <StatCard title="Workflow" value={str(overview.workflow_skill_count)} meta="SKILL.md / OpenClaw-style skills" tone="warn"/>
+            <StatCard title="Workspace" value={str(overview.workspace_skill_count)} meta="Repo-local skills" tone="info"/>
+            <StatCard title="Managed" value={str(overview.managed_skill_count)} meta="ClawHub or git-tracked" tone="info"/>
+        </div>
+        <div className="layout-grid">
+            <SectionCard title="Skill Sources" subtitle="Current installation distribution" body={
+                <div className="list-grid">
+                    <div className="list-item"><div className="list-item-title">Bundled</div><div className="list-item-meta">{str(overview.bundled_skill_count)}</div></div>
+                    <div className="list-item"><div className="list-item-title">Workspace</div><div className="list-item-meta">{str(overview.workspace_skill_count)}</div></div>
+                    <div className="list-item"><div className="list-item-title">Shared</div><div className="list-item-meta">{str(overview.shared_skill_count)}</div></div>
+                    <div className="list-item"><div className="list-item-title">Managed</div><div className="list-item-meta">{str(overview.managed_skill_count)}</div></div>
+                </div>
+            }/>
+            <SectionCard title="Inventory" subtitle="Resolved skill view using the latest runtime precedence" body={
+                <div className="list-grid">
+                    {[<div key={label} className="list-item"><div className="list-item-title">{label}</div></div> for label in overview.skill_inventory_labels]}
+                </div>
+            }/>
+        </div>
+    </div>;
+}
+
+
+def GraphView(memory: MemoryResponse, onRefresh: any) -> JsxElement {
+    return <div className="graph-shell">
+        <div className="graph-toolbar">
+            <button className="graph-refresh" onClick={onRefresh}>Refresh graph</button>
+        </div>
+        <div className="graph-canvas">
+            <GraphMemoryCanvas memory={memory}/>
+        </div>
+        <div className="graph-legend">
+            <div className="list-item"><div className="list-item-title">Root node</div><div className="list-item-meta">Pinned assistant origin for the graph cluster</div></div>
+            <div className="list-item"><div className="list-item-title">Core identity</div><div className="list-item-meta">Name, identity, soul, dream cadence, and other foundational nodes</div></div>
+            <div className="list-item"><div className="list-item-title">Conversation graph</div><div className="list-item-meta">Movable sessions, turns, and memory nodes connected through live relationships</div></div>
         </div>
     </div>;
 }
@@ -160,7 +225,7 @@ def MemoryContent(memory: MemoryResponse) -> JsxElement {
         <div className="page-header">
             <div>
                 <h1>Graph Memory</h1>
-                <p>Inspect persisted profile, memory nodes, sessions, and relationships from the current Graphclaw workspace.</p>
+                <p>Inspect the knowledge graph directly: rooted identity nodes, session branches, and memory relationships visualized as a live graph instead of a flat card list.</p>
             </div>
             <div className="header-actions">
                 <StatusPill text={str(memory.node_count) + " nodes"} tone="info"/>
@@ -168,16 +233,26 @@ def MemoryContent(memory: MemoryResponse) -> JsxElement {
             </div>
         </div>
         <div className="memory-grid">
-            <SectionCard title="Node Explorer" subtitle="Profile, memories, sessions, and turns" body={
-                <div className="node-grid">
-                    {[<div key={node.id} className="node-card">
-                        <div className="node-kind">{node.kind}</div>
-                        <div className="node-title">{node.label}</div>
-                        <div className="list-item-meta">ID: {node.id}</div>
-                    </div> for node in memory.nodes[:40]]}
-                </div>
+            <SectionCard title="Knowledge Graph" subtitle="Jac-style node-link view of the current memory graph" body={
+                <GraphView memory={memory} onRefresh={lambda { refresh_memory(); }}/>
             }/>
             <div className="stack">
+                <SectionCard title="Core Identity Graph" subtitle="Seeded root graph available before conversations begin" body={
+                    <div className="list-grid">
+                        {[<div key={label} className="list-item"><div className="list-item-title">{label}</div></div> for label in memory.core_node_labels]}
+                        <div className="list-item"><div className="list-item-title">Core edges</div><div className="list-item-meta">{str(memory.core_edge_count)}</div></div>
+                    </div>
+                }/>
+                <SectionCard title="Node Details" subtitle="Exact node payloads driving the graph view" body={
+                    <div className="node-grid">
+                        {[<div key={node.id} className="node-card">
+                            <div className="node-kind">{node.kind}</div>
+                            <div className="node-title">{node.label}</div>
+                            <div className="list-item-meta">{node.system_key != "" and node.system_key or "ad-hoc node"}</div>
+                            <div className="list-item-meta">{len(node.topics) > 0 and "Topics: " + ", ".join(node.topics) or "No topics yet"}</div>
+                        </div> for node in memory.nodes[:18]]}
+                    </div>
+                }/>
                 <SectionCard title="Relationship Feed" subtitle="Derived from persisted memory edges" body={
                     <div className="edge-list">
                         {[<div key={edge.source + "-" + edge.target + "-" + edge.label} className="edge-item">
@@ -212,13 +287,23 @@ def:pub DashboardApp() -> JsxElement {
         loading = False;
     }
 
+    async def refresh_memory() {
+        try {
+            memory = await dashboard_memory();
+        } except Exception as e {
+            error = f"Dashboard failed to load: {e}";
+        }
+    }
+
     async can with entry {
         await load_data();
     }
 
+
     overview_nav_class = "nav-link";
     sessions_nav_class = "nav-link";
     channels_nav_class = "nav-link";
+    skills_nav_class = "nav-link";
     memory_nav_class = "nav-link";
     if page == "overview" {
         overview_nav_class = "nav-link active";
@@ -228,6 +313,9 @@ def:pub DashboardApp() -> JsxElement {
     }
     if page == "channels" {
         channels_nav_class = "nav-link active";
+    }
+    if page == "skills" {
+        skills_nav_class = "nav-link active";
     }
     if page == "memory" {
         memory_nav_class = "nav-link active";
@@ -243,6 +331,8 @@ def:pub DashboardApp() -> JsxElement {
             body = <SessionsContent overview={overview}/>;
         } elif page == "channels" {
             body = <ChannelsContent overview={overview}/>;
+        } elif page == "skills" {
+            body = <SkillsContent overview={overview}/>;
         } else {
             body = <OverviewContent overview={overview}/>;
         }
@@ -265,6 +355,10 @@ def:pub DashboardApp() -> JsxElement {
                 <button className={channels_nav_class} onClick={lambda -> None { page = "channels"; }}>
                     <span className="nav-title">Channels</span>
                     <span className="nav-meta">Channel status and config snapshot</span>
+                </button>
+                <button className={skills_nav_class} onClick={lambda -> None { page = "skills"; }}>
+                    <span className="nav-title">Skills</span>
+                    <span className="nav-meta">Workspace, bundled, and managed skills</span>
                 </button>
                 <button className={memory_nav_class} onClick={lambda -> None { page = "memory"; }}>
                     <span className="nav-title">Graph Memory</span>

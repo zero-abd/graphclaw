@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import time
+import tomllib
 import urllib.request
 import webbrowser
 from pathlib import Path
@@ -45,6 +46,10 @@ def _log_path() -> Path:
     return path
 
 
+def _dashboard_client_dir() -> Path:
+    return _dashboard_project_root() / ".jac" / "client"
+
+
 def _dashboard_config() -> dict[str, Any]:
     cfg = load_config(force_reload=True)
     dashboard = getattr(cfg, "dashboard", {}) or {}
@@ -65,7 +70,7 @@ def dashboard_url() -> str:
 
 def dashboard_api_url() -> str:
     cfg = _dashboard_config()
-    return f"http://{cfg['host']}:{cfg['port']}/api/overview"
+    return f"http://{cfg['host']}:{cfg['port'] + 1}/"
 
 
 def _jac_executable() -> str:
@@ -104,6 +109,31 @@ def _recent_log_excerpt() -> str:
         return ""
     excerpt = text[-1200:].strip()
     return excerpt
+
+
+def _ensure_dashboard_client_sync() -> None:
+    jac_toml = _dashboard_project_root() / "jac.toml"
+    package_json = _dashboard_client_dir() / "configs" / "package.json"
+    helper_src = _dashboard_project_root() / "graph_helpers.js"
+    helper_dest = _dashboard_client_dir() / "compiled" / "graph_helpers.js"
+    if not jac_toml.exists() or not package_json.exists():
+        if helper_src.exists():
+            helper_dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(helper_src, helper_dest)
+        return
+    try:
+        jac_data = tomllib.loads(jac_toml.read_text(encoding="utf-8"))
+        package_data = json.loads(package_json.read_text(encoding="utf-8"))
+    except Exception:
+        return
+
+    expected = set((jac_data.get("dependencies", {}) or {}).get("npm", {}).keys())
+    actual = set((package_data.get("dependencies") or {}).keys())
+    if expected - actual:
+        shutil.rmtree(_dashboard_client_dir(), ignore_errors=True)
+    if helper_src.exists():
+        helper_dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(helper_src, helper_dest)
 
 
 def _read_state() -> dict[str, Any]:
@@ -153,19 +183,12 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
             webbrowser.open(url)
         return url
 
+    _ensure_dashboard_client_sync()
     log_handle = _log_path().open("a", encoding="utf-8")
     env = _with_repo_on_pythonpath(dict(os.environ))
     env.setdefault("GRAPHCLAW_CONFIG_PATH", os.environ.get("GRAPHCLAW_CONFIG_PATH", ""))
     env.setdefault("GRAPHCLAW_HOME", str(_graphclaw_home()))
-    cmd = [
-        sys.executable,
-        "-m",
-        "graphclaw.dashboard_server",
-        "--host",
-        cfg["host"],
-        "--port",
-        str(cfg["port"]),
-    ]
+    cmd = [_jac_executable(), "start", "--dev", "--port", str(cfg["port"])]
     proc = subprocess.Popen(
         cmd,
         cwd=str(_dashboard_project_root()),
@@ -201,7 +224,8 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
 
     if proc.poll() is None and _is_dashboard_reachable(api_url):
         raise RuntimeError(
-            "Dashboard API started, but the web UI did not become reachable.\n"
+            "Dashboard API started, but the web UI did not become reachable. "
+            "Make sure jac-client and bun are installed, then try again.\n"
             + _recent_log_excerpt()
         )
 
