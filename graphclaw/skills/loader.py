@@ -1,4 +1,4 @@
-"""Skill loader — discovers local skills and integrates with ClawHub API."""
+"""Skill loader — discovers local skills, recommends them, and integrates with ClawHub."""
 from __future__ import annotations
 import asyncio
 import inspect
@@ -10,6 +10,7 @@ from graphclaw.config.loader import load_config
 
 
 CLAWHUB_BASE = "https://clawhub.ai"
+_SKILL_RECOMMENDATION_CACHE: dict[tuple[str, int, str], list[dict[str, Any]]] = {}
 
 
 def _workspace_root() -> Path:
@@ -90,43 +91,16 @@ def _update_lock(slug: str, *, source: str, version: str = "latest", skill_type:
 def list_skills() -> List[Dict[str, Any]]:
     """List all installed skills using OpenClaw-style search precedence."""
     skills = []
-    seen = set()
-    lock = _read_lock().get("skills", {})
-    for base in _skill_runtime_paths() + [_builtin_skills_dir()]:
-        if not base.is_dir():
-            continue
-        for entry in sorted(base.iterdir()):
-            if not entry.is_dir() or entry.name.startswith('.'):
-                continue
-            if entry.name in seen:
-                continue
-            meta_file = entry / "skill.json"
-            md_file = entry / "SKILL.md"
-            if meta_file.exists():
-                try:
-                    meta = json.loads(meta_file.read_text(encoding="utf-8"))
-                    seen.add(entry.name)
-                    skills.append({
-                        "name": meta.get("name", entry.name),
-                        "slug": entry.name,
-                        "type": "native",
-                        "description": meta.get("description", ""),
-                        "path": str(entry),
-                        "source": lock.get(entry.name, {}).get("source", "bundled" if base == _builtin_skills_dir() else "local"),
-                    })
-                except Exception:
-                    pass
-            elif md_file.exists():
-                front = _parse_frontmatter(md_file.read_text(encoding="utf-8"))
-                seen.add(entry.name)
-                skills.append({
-                    "name": front.get("name", entry.name),
-                    "slug": entry.name,
-                    "type": "skill",
-                    "description": front.get("description", ""),
-                    "path": str(entry),
-                    "source": lock.get(entry.name, {}).get("source", "local"),
-                })
+    for candidate in _skill_candidate_catalog():
+        skills.append({
+            "name": candidate.get("name", candidate.get("slug", "")),
+            "slug": candidate.get("slug", ""),
+            "type": candidate.get("type", "skill"),
+            "description": candidate.get("description", ""),
+            "path": candidate.get("path", ""),
+            "source": candidate.get("source", "local"),
+            "tags": candidate.get("tags", []),
+        })
     return skills
 
 
@@ -174,6 +148,238 @@ def _parse_frontmatter(text: str) -> Dict[str, str]:
             k, v = line.split(":", 1)
             result[k.strip()] = v.strip().strip('"').strip("'")
     return result
+
+
+def _frontmatter_list(frontmatter: Dict[str, str], key: str) -> list[str]:
+    value = str(frontmatter.get(key, "") or "").strip()
+    if not value:
+        return []
+    normalized = value.strip().strip("[]")
+    parts = [part.strip().strip('"').strip("'") for part in normalized.split(",")]
+    return [part for part in parts if part]
+
+
+def _strip_frontmatter(text: str) -> str:
+    return re.sub(r'^---\s*\n.*?\n---\s*\n?', '', text, flags=re.DOTALL)
+
+
+def _skill_preview_from_markdown(text: str, limit: int = 280) -> str:
+    stripped = _strip_frontmatter(text)
+    lines = []
+    for raw in stripped.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        lines.append(line)
+        if len(" ".join(lines)) >= limit:
+            break
+    preview = " ".join(lines)
+    return preview[:limit].strip()
+
+
+def _task_terms(text: str) -> set[str]:
+    return {
+        token
+        for token in re.findall(r"[a-z0-9][a-z0-9_-]{2,}", text.lower())
+        if token not in {"the", "and", "for", "with", "from", "that", "this", "into", "your", "have"}
+    }
+
+
+def _skill_candidate_catalog() -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    lock = _read_lock().get("skills", {})
+    seen: set[str] = set()
+    for base in _skill_runtime_paths() + [_builtin_skills_dir()]:
+        if not base.is_dir():
+            continue
+        for entry in sorted(base.iterdir()):
+            if not entry.is_dir() or entry.name.startswith('.') or entry.name in seen:
+                continue
+            meta_file = entry / "skill.json"
+            md_file = entry / "SKILL.md"
+            if not (meta_file.exists() or md_file.exists()):
+                continue
+
+            description = ""
+            name = entry.name
+            tags: list[str] = []
+            preview = ""
+            skill_type = "skill"
+
+            if meta_file.exists():
+                try:
+                    meta = json.loads(meta_file.read_text(encoding="utf-8"))
+                    name = str(meta.get("name", name))
+                    description = str(meta.get("description", "") or "")
+                    raw_tags = meta.get("tags", []) or []
+                    if isinstance(raw_tags, list):
+                        tags = [str(tag).strip() for tag in raw_tags if str(tag).strip()]
+                    skill_type = str(meta.get("type", "native") or "native")
+                    preview = str(meta.get("summary", "") or "")
+                except Exception:
+                    pass
+
+            if md_file.exists():
+                text = md_file.read_text(encoding="utf-8")
+                front = _parse_frontmatter(text)
+                name = front.get("name", name)
+                description = front.get("description", description)
+                tags = tags or _frontmatter_list(front, "tags") or _frontmatter_list(front, "keywords")
+                preview = preview or _skill_preview_from_markdown(text)
+                skill_type = "skill"
+
+            source = lock.get(entry.name, {}).get("source", "bundled" if base == _builtin_skills_dir() else "local")
+            candidates.append({
+                "slug": entry.name,
+                "name": name,
+                "description": description,
+                "path": str(entry),
+                "type": skill_type,
+                "source": source,
+                "tags": tags,
+                "preview": preview,
+            })
+            seen.add(entry.name)
+    return candidates
+
+
+def _candidate_signature(candidates: list[dict[str, Any]]) -> str:
+    compact = [
+        {
+            "slug": item.get("slug", ""),
+            "description": item.get("description", ""),
+            "source": item.get("source", ""),
+            "tags": item.get("tags", []),
+            "preview": item.get("preview", ""),
+        }
+        for item in candidates
+    ]
+    return json.dumps(compact, sort_keys=True)
+
+
+def _prefilter_candidates(task: str, candidates: list[dict[str, Any]], *, max_candidates: int = 8) -> list[dict[str, Any]]:
+    if len(candidates) <= max_candidates:
+        return candidates
+    terms = _task_terms(task)
+    scored: list[tuple[int, dict[str, Any]]] = []
+    for candidate in candidates:
+        haystack = " ".join([
+            str(candidate.get("slug", "")),
+            str(candidate.get("name", "")),
+            str(candidate.get("description", "")),
+            " ".join(candidate.get("tags", []) or []),
+            str(candidate.get("preview", "")),
+        ]).lower()
+        score = sum(1 for term in terms if term in haystack)
+        if task and task.lower() in haystack:
+            score += 2
+        scored.append((score, candidate))
+    scored.sort(key=lambda item: (item[0], len(str(item[1].get("description", "")))), reverse=True)
+    head = [candidate for _, candidate in scored[:max_candidates]]
+    return head or candidates[:max_candidates]
+
+
+def _fallback_recommendations(task: str, candidates: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    picks = _prefilter_candidates(task, candidates, max_candidates=max(limit, 3))
+    results = []
+    for idx, candidate in enumerate(picks[:limit], start=1):
+        results.append({
+            "slug": candidate.get("slug", ""),
+            "name": candidate.get("name", candidate.get("slug", "")),
+            "description": candidate.get("description", ""),
+            "source": candidate.get("source", "local"),
+            "confidence": max(0.2, 0.6 - ((idx - 1) * 0.1)),
+            "reason": "Closest installed skill match from local metadata.",
+        })
+    return results
+
+
+def recommend_skills(task: str, limit: int = 3) -> list[dict[str, Any]]:
+    task = str(task or "").strip()
+    if not task:
+        return []
+
+    candidates = _skill_candidate_catalog()
+    if not candidates:
+        return []
+
+    shortlisted = _prefilter_candidates(task, candidates)
+    signature = _candidate_signature(shortlisted)
+    cache_key = (task, limit, signature)
+    if cache_key in _SKILL_RECOMMENDATION_CACHE:
+        return _SKILL_RECOMMENDATION_CACHE[cache_key]
+
+    by_slug = {candidate["slug"]: candidate for candidate in shortlisted}
+    try:
+        import jaclang  # noqa: F401
+        from graphclaw.skills.selector import SkillCandidate, recommend_skill_matches
+
+        matches = recommend_skill_matches(
+            task,
+            [
+                SkillCandidate(
+                    slug=candidate["slug"],
+                    name=candidate.get("name", ""),
+                    description=candidate.get("description", ""),
+                    source=candidate.get("source", ""),
+                    tags=candidate.get("tags", []) or [],
+                    preview=candidate.get("preview", ""),
+                )
+                for candidate in shortlisted
+            ],
+            limit,
+        )
+        if isinstance(matches, str):
+            matches = json.loads(matches)
+
+        recommendations: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for match in matches:
+            if isinstance(match, dict):
+                slug = str(match.get("slug", "") or "").strip()
+                raw_confidence = match.get("confidence", 0.0)
+                raw_reason = match.get("reason", "")
+            else:
+                slug = str(getattr(match, "slug", "") or "").strip()
+                raw_confidence = getattr(match, "confidence", 0.0)
+                raw_reason = getattr(match, "reason", "")
+            if not slug or slug not in by_slug or slug in seen:
+                continue
+            candidate = by_slug[slug]
+            confidence = raw_confidence
+            try:
+                confidence = max(0.0, min(1.0, float(confidence)))
+            except Exception:
+                confidence = 0.0
+            recommendations.append({
+                "slug": slug,
+                "name": candidate.get("name", slug),
+                "description": candidate.get("description", ""),
+                "source": candidate.get("source", "local"),
+                "confidence": confidence,
+                "reason": str(raw_reason or "").strip(),
+            })
+            seen.add(slug)
+
+        if not recommendations:
+            recommendations = _fallback_recommendations(task, shortlisted, limit)
+    except Exception:
+        recommendations = _fallback_recommendations(task, shortlisted, limit)
+
+    _SKILL_RECOMMENDATION_CACHE[cache_key] = recommendations[:limit]
+    return recommendations[:limit]
+
+
+def build_recommended_skills_summary(task: str, limit: int = 3) -> str:
+    recommendations = recommend_skills(task, limit=limit)
+    if not recommendations:
+        return "No strong installed skill match was found for this task."
+    lines = []
+    for skill in recommendations:
+        lines.append(
+            f"- {skill['slug']} ({skill['confidence']:.2f}) from {skill['source']}: {skill['reason'] or skill['description']}"
+        )
+    return "\n".join(lines)
 
 
 async def search_clawhub(query: str) -> List[Dict[str, Any]]:
