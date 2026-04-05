@@ -236,7 +236,7 @@ class ConfigurePlatformMCPServersTool(_ProgressMixin):
 
 class SaveLoveableCredentialsTool(_ProgressMixin):
     name = "save_loveable_credentials"
-    description = "Securely store the user's Loveable login email/username and password for browser-assisted Lovable tasks."
+    description = "Securely store the user's Loveable login email/username and password for browser-assisted Lovable tasks. Loveable does not require an API key for this flow."
     parameters = {
         "type": "object",
         "properties": {
@@ -255,7 +255,7 @@ class SaveLoveableCredentialsTool(_ProgressMixin):
             username=str(kwargs.get("username", "")),
             password=str(kwargs.get("password", "")),
         )
-        return "Saved your Loveable login securely for this chat user. I can now use it for browser-assisted Lovable flows."
+        return "Saved your Loveable login email and password securely for this chat user. I can now use them to sign into lovable.dev in the browser flow."
 
 
 class ClearLoveableCredentialsTool(_ProgressMixin):
@@ -277,7 +277,8 @@ class LoveableLandingPageTool(_ProgressMixin):
     name = "loveable_landing_page"
     description = (
         "Create a Lovable landing page flow. If Playwright MCP and Lovable credentials are configured, "
-        "Graphclaw will try to drive Lovable in the browser, publish the site, and return the shareable URL."
+        "Graphclaw will try to drive Lovable in the browser, publish the site, and return the shareable URL. "
+        "This flow uses your Loveable login in the browser, not a Loveable API key."
     )
     parameters = {
         "type": "object",
@@ -324,7 +325,7 @@ class LoveableLandingPageTool(_ProgressMixin):
                 user_id=getattr(self, "_user_id", "user"),
             )
             if credentials is None:
-                result["notes"].append("To fully automate publish, first save Lovable credentials and configure the recommended Playwright MCP server.")
+                result["notes"].append("To fully automate publish, first save your Lovable login email/password and configure the recommended Playwright MCP server. No Loveable API key is needed.")
             else:
                 try:
                     publish_flow = await self._run_loveable_publish_via_mcp(
@@ -343,7 +344,7 @@ class LoveableLandingPageTool(_ProgressMixin):
 
 class LoveableBuildUrlTool(_ProgressMixin):
     name = "loveable_build_url"
-    description = "Generate a raw official Lovable Build with URL link from any prompt."
+    description = "Generate a raw official Lovable Build with URL link from any prompt. This uses the browser/login flow and does not require a Loveable API key."
     parameters = {
         "type": "object",
         "properties": {
@@ -383,7 +384,7 @@ class LoveableBuildUrlTool(_ProgressMixin):
                 user_id=getattr(self, "_user_id", "user"),
             )
             if credentials is None:
-                result["notes"].append("To fully automate publish, first save Lovable credentials and configure the recommended Playwright MCP server.")
+                result["notes"].append("To fully automate publish, first save your Lovable login email/password and configure the recommended Playwright MCP server. No Loveable API key is needed.")
             else:
                 try:
                     publish_flow = await self._run_loveable_publish_via_mcp(

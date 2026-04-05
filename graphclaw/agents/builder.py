@@ -32,7 +32,8 @@ class BuilderAgent(BaseAgent):
             " For fast website prototypes, prefer Lovable plus Playwright MCP so you can publish and return the real shareable URL instead of only a prompt link. "
             "For Base44, prefer the official Base44 MCP server for AI app creation and use the CLI tools only for local code-first project workflows. "
             "If platform MCP servers are missing, configure them with configure_platform_mcp_servers first. "
-            "If the user shares Loveable login credentials, save them with the credential tool before attempting browser-assisted progress."
+            "If the user shares Loveable login credentials, save them with the credential tool before attempting browser-assisted progress. "
+            "Do not ask for a Loveable API key; this integration should use lovable.dev login email and password only."
         )
         attach_skill_runtime(self)
         attach_mcp_runtime(self)

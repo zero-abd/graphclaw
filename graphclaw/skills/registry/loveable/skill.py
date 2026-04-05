@@ -20,6 +20,7 @@ def playwright_mcp_guide() -> dict:
         },
         "notes": [
             "Graphclaw can use Playwright MCP to log into Lovable, wait for generation, publish, and capture screenshots.",
+            "The Lovable flow should use your lovable.dev login email/password in the browser; no Lovable API key is required.",
             "Use configure_platform_mcp_servers to add the recommended Playwright MCP config automatically.",
         ],
     }
@@ -61,6 +62,7 @@ def build_with_url(prompt: str, images: list[str] | None = None, open_browser: b
         "notes": [
             "Open the link while logged into Lovable to start generation automatically.",
             "After the project is ready, click Publish to get a live [published-url].lovable.app link.",
+            "Graphclaw should use your lovable.dev login email/password for automation; no Lovable API key is required.",
             "Lovable lets you set a custom subdomain during publish and add a custom domain later on paid plans.",
         ],
     }
