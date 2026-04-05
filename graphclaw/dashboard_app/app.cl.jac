@@ -202,12 +202,57 @@ def SkillsContent(overview: OverviewResponse) -> JsxElement {
 }
 
 
+def GraphView(memory: MemoryResponse) -> JsxElement {
+    root_label = len(memory.core_node_labels) > 0 and memory.core_node_labels[0] or "Graphclaw root";
+    upper_label = len(memory.core_node_labels) > 1 and memory.core_node_labels[1] or "Name";
+    right_label = len(memory.core_node_labels) > 2 and memory.core_node_labels[2] or "Identity";
+    lower_label = len(memory.core_node_labels) > 3 and memory.core_node_labels[3] or "Soul";
+    left_label = len(memory.core_node_labels) > 4 and memory.core_node_labels[4] or "Dream cadence";
+    return <div className="graph-shell">
+        <div className="graph-canvas">
+            <svg className="graph-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+                <line x1="50%" y1="50%" x2="50%" y2="20%" className="graph-edge" />
+                <line x1="50%" y1="50%" x2="80%" y2="50%" className="graph-edge" />
+                <line x1="50%" y1="50%" x2="50%" y2="80%" className="graph-edge" />
+                <line x1="50%" y1="50%" x2="20%" y2="50%" className="graph-edge" />
+
+                <g transform="translate(50 50)" className="graph-node root">
+                    <circle r="8" />
+                    <text y="12">{root_label[:28]}</text>
+                </g>
+                <g transform="translate(50 20)" className="graph-node core">
+                    <circle r="5.5" />
+                    <text y="10">{upper_label[:28]}</text>
+                </g>
+                <g transform="translate(80 50)" className="graph-node core">
+                    <circle r="5.5" />
+                    <text y="10">{right_label[:28]}</text>
+                </g>
+                <g transform="translate(50 80)" className="graph-node core">
+                    <circle r="5.5" />
+                    <text y="10">{lower_label[:28]}</text>
+                </g>
+                <g transform="translate(20 50)" className="graph-node core">
+                    <circle r="5.5" />
+                    <text y="10">{left_label[:28]}</text>
+                </g>
+            </svg>
+        </div>
+        <div className="graph-legend">
+            <div className="list-item"><div className="list-item-title">Root</div><div className="list-item-meta">Assistant root / profile node</div></div>
+            <div className="list-item"><div className="list-item-title">Core identity</div><div className="list-item-meta">Name, identity, soul, dream cadence</div></div>
+            <div className="list-item"><div className="list-item-title">Conversation graph</div><div className="list-item-meta">Sessions, turns, and consolidated memories</div></div>
+        </div>
+    </div>;
+}
+
+
 def MemoryContent(memory: MemoryResponse) -> JsxElement {
     return <div className="stack">
         <div className="page-header">
             <div>
                 <h1>Graph Memory</h1>
-                <p>Inspect persisted profile, memory nodes, sessions, and relationships from the current Graphclaw workspace.</p>
+                <p>Inspect the knowledge graph directly: rooted identity nodes, session branches, and memory relationships visualized as a live graph instead of a flat card list.</p>
             </div>
             <div className="header-actions">
                 <StatusPill text={str(memory.node_count) + " nodes"} tone="info"/>
@@ -215,20 +260,24 @@ def MemoryContent(memory: MemoryResponse) -> JsxElement {
             </div>
         </div>
         <div className="memory-grid">
-            <SectionCard title="Node Explorer" subtitle="Profile, memories, sessions, and turns" body={
-                <div className="node-grid">
-                    {[<div key={node.id} className="node-card">
-                        <div className="node-kind">{node.kind}</div>
-                        <div className="node-title">{node.label}</div>
-                        <div className="list-item-meta">ID: {node.id}</div>
-                    </div> for node in memory.nodes[:40]]}
-                </div>
+            <SectionCard title="Knowledge Graph" subtitle="Jac-style node-link view of the current memory graph" body={
+                <GraphView memory={memory}/>
             }/>
             <div className="stack">
                 <SectionCard title="Core Identity Graph" subtitle="Seeded root graph available before conversations begin" body={
                     <div className="list-grid">
                         {[<div key={label} className="list-item"><div className="list-item-title">{label}</div></div> for label in memory.core_node_labels]}
                         <div className="list-item"><div className="list-item-title">Core edges</div><div className="list-item-meta">{str(memory.core_edge_count)}</div></div>
+                    </div>
+                }/>
+                <SectionCard title="Node Details" subtitle="Exact node payloads driving the graph view" body={
+                    <div className="node-grid">
+                        {[<div key={node.id} className="node-card">
+                            <div className="node-kind">{node.kind}</div>
+                            <div className="node-title">{node.label}</div>
+                            <div className="list-item-meta">{node.system_key != "" and node.system_key or "ad-hoc node"}</div>
+                            <div className="list-item-meta">{len(node.topics) > 0 and "Topics: " + ", ".join(node.topics) or "No topics yet"}</div>
+                        </div> for node in memory.nodes[:18]]}
                     </div>
                 }/>
                 <SectionCard title="Relationship Feed" subtitle="Derived from persisted memory edges" body={
