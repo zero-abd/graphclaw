@@ -17,7 +17,14 @@ def dispatch_message(msg: InboundMessage) {
     import traceback
 
     from graphclaw.agents.coordinator_runtime import run_coordinator
-    from graphclaw.memory.backend import append_turn, consolidate_session, get_memory_context, start_session
+    from graphclaw.memory.backend import (
+        append_turn,
+        consolidate_session,
+        extract_assistant_name_change,
+        get_assistant_name,
+        get_memory_context,
+        start_session,
+    )
 
     def _extract_content(result: object) -> str:
         if result is None:
@@ -39,6 +46,15 @@ def dispatch_message(msg: InboundMessage) {
             )
             append_turn(session_id=session_id, role="user", content=msg.text)
 
+            assistant_name = get_assistant_name()
+            renamed_to = extract_assistant_name_change(msg.text)
+            if renamed_to:
+                content = f"Got it — I'll go by {renamed_to} from now on."
+                append_turn(session_id=session_id, role="assistant", content=content)
+                consolidate_session(session_id)
+                bus.publish_outbound(OutboundMessage(channel=msg.channel, chat_id=msg.chat_id, text=content))
+                return
+
             memory_context = get_memory_context(max_chars=3000)
             query = msg.text
             if memory_context:
@@ -49,6 +65,7 @@ def dispatch_message(msg: InboundMessage) {
                 channel=msg.channel,
                 chat_id=msg.chat_id,
                 user_id=msg.user_id,
+                assistant_name=assistant_name,
             )
             content = _extract_content(result)
 
