@@ -53,6 +53,10 @@ def _skill_search_paths() -> list[Path]:
     return [_workspace_skills_dir(), _shared_skills_dir(), _legacy_installed_dir(), _builtin_skills_dir()]
 
 
+def _skill_runtime_paths() -> list[Path]:
+    return [_workspace_skills_dir(), _shared_skills_dir(), _legacy_installed_dir()]
+
+
 def _read_lock() -> dict[str, Any]:
     path = _lock_path()
     if not path.exists():
@@ -88,7 +92,7 @@ def list_skills() -> List[Dict[str, Any]]:
     skills = []
     seen = set()
     lock = _read_lock().get("skills", {})
-    for base in _skill_search_paths():
+    for base in _skill_runtime_paths() + [_builtin_skills_dir()]:
         if not base.is_dir():
             continue
         for entry in sorted(base.iterdir()):
@@ -142,7 +146,7 @@ def build_skills_summary(limit: int = 24) -> str:
 
 def list_native_skill_functions(slug: str) -> List[str]:
     """Return callable public functions exposed by a native skill."""
-    for base in _skill_search_paths():
+    for base in _skill_runtime_paths() + [_builtin_skills_dir()]:
         skill_dir = base / slug
         meta_file = skill_dir / "skill.json"
         py_file = skill_dir / "skill.py"
@@ -280,7 +284,7 @@ async def update_all_skills() -> str:
 
 def invoke_skill(slug: str, function_name: str = "", **kwargs: Any) -> str:
     """Invoke a native skill function or return ClawHub instructions."""
-    for base in _skill_search_paths():
+    for base in _skill_runtime_paths() + [_builtin_skills_dir()]:
         skill_dir = base / slug
         if not skill_dir.is_dir():
             continue
@@ -312,7 +316,7 @@ def invoke_skill(slug: str, function_name: str = "", **kwargs: Any) -> str:
 
 async def invoke_skill_async(slug: str, function_name: str = "", **kwargs: Any) -> str:
     """Invoke a native skill function asynchronously or return ClawHub instructions."""
-    for base in _skill_search_paths():
+    for base in _skill_runtime_paths() + [_builtin_skills_dir()]:
         skill_dir = base / slug
         if not skill_dir.is_dir():
             continue
