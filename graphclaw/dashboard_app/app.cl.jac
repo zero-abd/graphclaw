@@ -234,7 +234,7 @@ def MemoryContent(memory: MemoryResponse) -> JsxElement {
         </div>
         <div className="memory-grid">
             <SectionCard title="Knowledge Graph" subtitle="Jac-style node-link view of the current memory graph" body={
-                <GraphView memory={memory} onRefresh={lambda -> None { memory = await dashboard_memory(); }}/>
+                <GraphView memory={memory} onRefresh={lambda { refresh_memory(); }}/>
             }/>
             <div className="stack">
                 <SectionCard title="Core Identity Graph" subtitle="Seeded root graph available before conversations begin" body={
@@ -285,6 +285,14 @@ def:pub DashboardApp() -> JsxElement {
             error = f"Dashboard failed to load: {e}";
         }
         loading = False;
+    }
+
+    async def refresh_memory() {
+        try {
+            memory = await dashboard_memory();
+        } except Exception as e {
+            error = f"Dashboard failed to load: {e}";
+        }
     }
 
     async can with entry {

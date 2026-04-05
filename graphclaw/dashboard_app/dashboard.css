@@ -54,6 +54,9 @@ body {
 .node-kind { font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: #93c5fd; }
 .node-title { margin-top: 10px; font-size: 14px; font-weight: 600; }
 .graph-shell { display: grid; gap: 16px; }
+.graph-toolbar { display: flex; justify-content: flex-end; }
+.graph-refresh { padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line-strong); background: rgba(56, 189, 248, 0.12); color: var(--text); font-weight: 600; cursor: pointer; }
+.graph-refresh:hover { background: rgba(56, 189, 248, 0.22); }
 .graph-canvas { min-height: 460px; border-radius: 22px; border: 1px solid var(--line); background: radial-gradient(circle at center, rgba(56, 189, 248, 0.08), rgba(2, 6, 23, 0.92)); overflow: hidden; }
 .graph-svg { width: 100%; height: 460px; display: block; }
 .graph-edge { stroke: rgba(125, 211, 252, 0.35); stroke-width: 0.35; }
