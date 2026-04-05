@@ -45,11 +45,11 @@ edge HasSkill {}
 #   "author": "graphclaw",
 #   "tools": ["deploy_app", "get_app_status", "get_build_logs", "update_env_vars"],
 #   "requirements": [],
-#   "source_url": "https://github.com/graphclaw/skills-registry/tree/main/base44"
+#   "source_url": "https://github.com/zero-abd/skills-registry/tree/main/base44"
 # }
 
 glob BUILTIN_SKILLS_DIR: str = str(Path(__file__).parent / "registry");
-glob REGISTRY_INDEX_URL: str = "https://raw.githubusercontent.com/graphclaw/skills-registry/main/index.json";
+glob REGISTRY_INDEX_URL: str = "https://raw.githubusercontent.com/zero-abd/skills-registry/main/index.json";
 
 # ── Scan and register built-in + installed skills ─────────────────────────────
 

@@ -57,17 +57,17 @@ Inspired by [nanobot](https://github.com/HKUDS/nanobot) and [openclaw](https://g
 
 **Linux / macOS / WSL:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/graphclaw/graphclaw/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.sh | bash
 ```
 
 **Windows (PowerShell — run as Administrator):**
 ```powershell
-irm https://raw.githubusercontent.com/graphclaw/graphclaw/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.ps1 | iex
 ```
 
 **From a local clone:**
 ```bash
-git clone https://github.com/graphclaw/graphclaw
+git clone https://github.com/zero-abd/graphclaw
 cd graphclaw
 bash install.sh        # Linux / macOS / WSL
 .\install.ps1          # Windows PowerShell
@@ -260,7 +260,7 @@ Full config at `~/.graphclaw/config.json`. Key fields:
     }
   },
   "skills": {
-    "registry_url": "https://raw.githubusercontent.com/graphclaw/skills-registry/main/index.json"
+    "registry_url": "https://raw.githubusercontent.com/zero-abd/skills-registry/main/index.json"
   }
 }
 ```
@@ -316,7 +316,7 @@ graphclaw/
 ## Roadmap
 
 - [ ] CLI (`graphclaw run`, `graphclaw skill install`, `graphclaw memory`)
-- [ ] `graphclaw/skills-registry` — public community skill repository
+- [ ] `zero-abd/skills-registry` — public community skill repository
 - [ ] More DevOps skills: Kubernetes, Docker, GitHub Actions, Vercel, Railway, AWS
 - [ ] Streaming output to channels
 - [ ] Web UI (Jac `cl {}` codespace — React frontend auto-generated)

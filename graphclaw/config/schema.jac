@@ -130,7 +130,7 @@ obj ChannelsConfig {
 # ── Skills ────────────────────────────────────────────────────────────────────
 
 obj SkillsConfig {
-    has registry_url: str = "https://raw.githubusercontent.com/graphclaw/skills-registry/main/index.json";
+    has registry_url: str = "https://raw.githubusercontent.com/zero-abd/skills-registry/main/index.json";
     has auto_update: bool = False;
     has installed_path: str = "~/.graphclaw/skills/installed";
 }
