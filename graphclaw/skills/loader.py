@@ -103,6 +103,7 @@ def list_skills() -> List[Dict[str, Any]]:
             "path": candidate.get("path", ""),
             "source": candidate.get("source", "local"),
             "tags": candidate.get("tags", []),
+            "tools": candidate.get("tools", []),
         })
     return skills
 
@@ -115,6 +116,7 @@ def build_skills_summary(limit: int = 24) -> str:
     for skill in skills[:limit]:
         lines.append(
             f"- {skill.get('slug', 'skill')} [{skill.get('type', 'skill')}] from {skill.get('source', 'local')}: {skill.get('description', '')}"
+            + (f" | functions: {', '.join(skill.get('tools', []))}" if skill.get("tools") else "")
         )
     if len(skills) > limit:
         lines.append(f"- ... and {len(skills) - limit} more")
@@ -195,6 +197,7 @@ def _candidate_keyword_overlap(task: str, candidate: dict[str, Any]) -> int:
         str(candidate.get("name", "")),
         str(candidate.get("description", "")),
         " ".join(candidate.get("tags", []) or []),
+        " ".join(candidate.get("tools", []) or []),
         str(candidate.get("preview", "")),
     ]).lower()
     return sum(1 for term in terms if term in haystack)
@@ -218,6 +221,7 @@ def _skill_candidate_catalog() -> list[dict[str, Any]]:
             description = ""
             name = entry.name
             tags: list[str] = []
+            tool_names: list[str] = []
             preview = ""
             skill_type = "skill"
 
@@ -229,6 +233,9 @@ def _skill_candidate_catalog() -> list[dict[str, Any]]:
                     raw_tags = meta.get("tags", []) or []
                     if isinstance(raw_tags, list):
                         tags = [str(tag).strip() for tag in raw_tags if str(tag).strip()]
+                    raw_tools = meta.get("tools", []) or []
+                    if isinstance(raw_tools, list):
+                        tool_names = [str(tool).strip() for tool in raw_tools if str(tool).strip()]
                     skill_type = str(meta.get("type", "native") or "native")
                     preview = str(meta.get("summary", "") or "")
                 except Exception:
@@ -252,6 +259,7 @@ def _skill_candidate_catalog() -> list[dict[str, Any]]:
                 "type": skill_type,
                 "source": source,
                 "tags": tags,
+                "tools": tool_names,
                 "preview": preview,
             })
             seen.add(entry.name)
@@ -265,6 +273,7 @@ def _candidate_signature(candidates: list[dict[str, Any]]) -> str:
             "description": item.get("description", ""),
             "source": item.get("source", ""),
             "tags": item.get("tags", []),
+            "tools": item.get("tools", []),
             "preview": item.get("preview", ""),
         }
         for item in candidates
@@ -283,6 +292,7 @@ def _prefilter_candidates(task: str, candidates: list[dict[str, Any]], *, max_ca
             str(candidate.get("name", "")),
             str(candidate.get("description", "")),
             " ".join(candidate.get("tags", []) or []),
+            " ".join(candidate.get("tools", []) or []),
             str(candidate.get("preview", "")),
         ]).lower()
         score = _candidate_keyword_overlap(task, candidate)
