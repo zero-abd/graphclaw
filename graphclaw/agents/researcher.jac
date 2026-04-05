@@ -1,13 +1,13 @@
 # graphclaw/agents/researcher.jac
 
-import from graphclaw.agents.base { BaseAgent };
-import from graphclaw.tools.web { WebSearchTool, WebFetchTool };
-import from graphclaw.memory.store { StoreMemory };
-import from graphclaw.memory.nodes { MemoryType };
+import from graphclaw.agents.base { BaseAgent }
+import from graphclaw.tools.web { WebSearchTool, WebFetchTool }
+import from graphclaw.memory.store { StoreMemory }
+import from graphclaw.memory.nodes { MemoryType }
 
 walker ResearcherAgent(BaseAgent) {
     has agent_name: str = "researcher";
-    has agent_description: str = "Researcher — web search, summarization, knowledge extraction";
+    has agent_description: str = "Researcher -- web search, summarization, knowledge extraction";
     has system_prompt_extra: str = """
 You are a research specialist. You:
 - Search the web for accurate, up-to-date information
@@ -19,12 +19,12 @@ You are a research specialist. You:
 After completing research, store key facts using store_memory so the team benefits.
 """;
 
-    can run with `root entry {
+    can run with `root() entry {
         self._tools = [WebSearchTool(), WebFetchTool(), self._make_store_memory_tool()];
         visit here;
     }
 
-    def _make_store_memory_tool() -> any {
+    def _make_store_memory_tool() -> Any {
         ::py::
         class _StoreMemoryTool:
             name = "store_memory"

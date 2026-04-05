@@ -1,5 +1,5 @@
 # graphclaw/memory/dream.jac
-# Dream walker — background graph maintenance (nanobot's "Dream" reimagined)
+# Dream walker -- background graph maintenance (nanobot's "Dream" reimagined)
 #
 # Instead of rewriting a MEMORY.md blob, Dream walks the graph and:
 #   1. Tombstones zero-confidence nodes
@@ -11,10 +11,10 @@
 import from graphclaw.memory.nodes {
     Memory, Topic, Relates, HasMemory, Tagged
 };
-import from graphclaw.memory.consolidate { ConsolidateAll };
-import from datetime { datetime, timezone };
+import from graphclaw.memory.consolidate { ConsolidateAll }
+import from datetime { datetime, timezone }
 
-# ── LLM helpers ───────────────────────────────────────────────────────────────
+# -- LLM helpers ---------------------------------------------------------------
 
 sem find_near_duplicates = "Given a list of memory contents, identify groups of memories that express the same fact (near-duplicates). Return indices of memories that should be merged (keep the most specific one).";
 
@@ -41,7 +41,7 @@ sem find_relationship = "Given two memory contents that are related but not cont
 
 def find_relationship(mem_a: str, mem_b: str) -> str by llm();
 
-# ── Dream walker ───────────────────────────────────────────────────────────────
+# -- Dream walker ---------------------------------------------------------------
 
 walker Dream {
     has max_memories: int = 100;
@@ -53,7 +53,7 @@ walker Dream {
     has _linked: int = 0;
     has _tagged: int = 0;
 
-    can run with `root entry {
+    can run with `root() entry {
         # Step 0: consolidate any pending sessions first
         ConsolidateAll(max_sessions=20) spawn here;
 
@@ -61,7 +61,7 @@ walker Dream {
         live_mems.sort(key=lambda m: m.effective_confidence());
         batch = live_mems[:self.max_memories];
 
-        # ── Step 1: Tombstone zero-confidence memories ─────────────────────
+        # -- Step 1: Tombstone zero-confidence memories ---------------------
         for m in batch {
             if m.is_stale() {
                 if not self.dry_run { m.tombstoned = True; }
@@ -70,7 +70,7 @@ walker Dream {
         }
         live_batch = [m for m in batch if not m.tombstoned];
 
-        # ── Step 2: Merge near-duplicates ──────────────────────────────────
+        # -- Step 2: Merge near-duplicates ----------------------------------
         contents = [m.content for m in live_batch];
         dup_groups = find_near_duplicates(contents);
         for group in dup_groups {
@@ -86,7 +86,7 @@ walker Dream {
         }
         live_batch = [m for m in live_batch if not m.tombstoned];
 
-        # ── Step 3: Link related memory pairs ──────────────────────────────
+        # -- Step 3: Link related memory pairs ------------------------------
         # Only check pairs that don't already have a Relates edge
         for i in range(len(live_batch)) {
             for j in range(i + 1, min(i + 6, len(live_batch))) {
@@ -108,10 +108,10 @@ walker Dream {
             }
         }
 
-        # ── Step 4: Revalidate stable memories ────────────────────────────
+        # -- Step 4: Revalidate stable memories ----------------------------
         for m in live_batch {
             eff = m.effective_confidence();
-            if 0.2 <= eff <= 0.6 {   # in the decay zone — worth checking
+            if 0.2 <= eff <= 0.6 {   # in the decay zone -- worth checking
                 if is_memory_still_valid(m.content) {
                     if not self.dry_run {
                         m.touch();
@@ -121,7 +121,7 @@ walker Dream {
             }
         }
 
-        # ── Step 5: Auto-tag untagged memories ────────────────────────────
+        # -- Step 5: Auto-tag untagged memories ----------------------------
         for m in live_batch {
             existing_tags = [here -->][?:Topic];
             tagged_mems = [];

@@ -1,5 +1,5 @@
 # graphclaw/memory/consolidate.jac
-# Consolidator walker — extracts structured Memory nodes from raw session turns
+# Consolidator walker -- extracts structured Memory nodes from raw session turns
 # Replaces nanobot's Consolidator class (LLM call over flat JSONL)
 
 import from graphclaw.memory.nodes {
@@ -7,7 +7,7 @@ import from graphclaw.memory.nodes {
     HasMemory, HasSession, HasTurn, Produced, Tagged
 };
 
-# ── LLM-powered extraction ─────────────────────────────────────────────────────
+# -- LLM-powered extraction -----------------------------------------------------
 
 obj ExtractedMemory {
     has content: str;
@@ -39,12 +39,12 @@ sem should_supersede = "Given a new memory and an existing memory, determine if 
 
 def should_supersede(new_mem: str, existing_mem: str) -> bool by llm();
 
-# ── Consolidator walker ────────────────────────────────────────────────────────
+# -- Consolidator walker --------------------------------------------------------
 
 walker Consolidate {
     has session_id: str;
 
-    can run with `root entry {
+    can run with `root() entry {
         # Find session
         sessions = [here -->(:HasSession:)--> (:Session)][
             ? session_id == self.session_id and consolidated == False
@@ -114,12 +114,12 @@ walker Consolidate {
     }
 }
 
-# ── Batch consolidation (process all unconsolidated sessions) ──────────────────
+# -- Batch consolidation (process all unconsolidated sessions) ------------------
 
 walker ConsolidateAll {
     has max_sessions: int = 10;
 
-    can run with `root entry {
+    can run with `root() entry {
         sessions = [here -->(:HasSession:)--> (:Session)][? consolidated == False];
         sessions.sort(key=lambda s: s.started_at);
         to_process = sessions[:self.max_sessions];

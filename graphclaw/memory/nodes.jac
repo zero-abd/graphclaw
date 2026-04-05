@@ -1,19 +1,19 @@
 # graphclaw/memory/nodes.jac
-# Graph schema — all memory lives here as OSP nodes connected to root
+# Graph schema -- all memory lives here as OSP nodes connected to root
 
-import from datetime { datetime, timezone };
-import from uuid { uuid4 };
+import from datetime { datetime, timezone }
+import from uuid { uuid4 }
 
-# ── Memory Types ──────────────────────────────────────────────────────────────
+# -- Memory Types --------------------------------------------------------------
 
 enum MemoryType {
-    USER = "User",          # Facts about the user — role, preferences, goals
+    USER = "User",          # Facts about the user -- role, preferences, goals
     FEEDBACK = "Feedback",  # Behavioral corrections and guidance
     PROJECT = "Project",    # Architecture, decisions, deadlines
     REFERENCE = "Reference" # Pointers to external resources
 }
 
-# ── Nodes ─────────────────────────────────────────────────────────────────────
+# -- Nodes ---------------------------------------------------------------------
 
 node Memory {
     has id: str = "";
@@ -97,7 +97,7 @@ node Turn {
     }
 }
 
-# Singleton node — one per user root, holds user-level identity
+# Singleton node -- one per user root, holds user-level identity
 node UserProfile {
     has display_name: str = "";
     has timezone: str = "UTC";
@@ -111,7 +111,7 @@ node UserProfile {
     }
 }
 
-# ── Edges ─────────────────────────────────────────────────────────────────────
+# -- Edges ---------------------------------------------------------------------
 
 edge Relates {
     has relationship: str = "related_to";

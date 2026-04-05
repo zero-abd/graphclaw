@@ -1,24 +1,25 @@
 # graphclaw/main.jac
-# Entry point — starts all channels and the agent dispatch loop
+# Entry point -- starts all channels and the agent dispatch loop
 
-import from graphclaw.config.loader { load_config, ensure_workspace };
-import from graphclaw.channels.bus { bus, InboundMessage, OutboundMessage };
-import from graphclaw.channels.telegram { start_telegram_channel };
-import from graphclaw.channels.discord { start_discord_channel };
-import from graphclaw.channels.slack { start_slack_channel };
-import from graphclaw.channels.email { start_email_channel };
-import from graphclaw.channels.whatsapp { start_whatsapp_channel };
-import from graphclaw.agents.coordinator { CoordinatorAgent };
-import from graphclaw.memory.dream { Dream };
-import from graphclaw.skills.loader { LoadSkills };
-import from asyncio { get_event_loop, Lock };
+import from graphclaw.config.loader { load_config, ensure_workspace }
+import from graphclaw.channels.bus { bus, InboundMessage, OutboundMessage }
+import from graphclaw.channels.telegram { start_telegram_channel }
+import from graphclaw.channels.discord { start_discord_channel }
+import from graphclaw.channels.slack { start_slack_channel }
+import from graphclaw.channels.email { start_email_channel }
+import from graphclaw.channels.whatsapp { start_whatsapp_channel }
+import from graphclaw.agents.coordinator { CoordinatorAgent }
+import from graphclaw.memory.dream { Dream }
+import from graphclaw.skills.loader { LoadSkills }
+import from asyncio { get_event_loop, Lock }
+import from typing { Any }
 
-# ── Per-session concurrency gate ───────────────────────────────────────────────
+# -- Per-session concurrency gate -----------------------------------------------
 
 glob _session_locks: dict = {};
-glob _global_sem: any = None;
+glob _global_sem: Any = None;
 
-def _get_session_lock(key: str) -> any {
+def _get_session_lock(key: str) -> Any {
     global _session_locks;
     ::py::
     import asyncio
@@ -29,12 +30,12 @@ def _get_session_lock(key: str) -> any {
     return _result;
 }
 
-# ── Agent dispatch ─────────────────────────────────────────────────────────────
+# -- Agent dispatch -------------------------------------------------------------
 
 walker DispatchMessage {
     has msg: InboundMessage;
 
-    can dispatch with `root entry {
+    can dispatch with `root() entry {
         cfg = load_config();
         session_key = f"{self.msg.channel}:{self.msg.chat_id}";
 
@@ -73,7 +74,7 @@ walker DispatchMessage {
     }
 }
 
-# ── Inbound message consumer ───────────────────────────────────────────────────
+# -- Inbound message consumer ---------------------------------------------------
 
 def start_dispatch_loop() {
     ::py::
@@ -87,7 +88,7 @@ def start_dispatch_loop() {
             # In a real jac runtime, this would use spawn on root
             # Here we call directly for simplicity
             try:
-                DispatchMessage(msg=msg).spawn(root)
+                DispatchMessage(msg=msg).spawn(root())
             except Exception as e:
                 print(f"[dispatch] error: {e}")
 
@@ -95,7 +96,7 @@ def start_dispatch_loop() {
     ::py::
 }
 
-# ── Dream scheduler ────────────────────────────────────────────────────────────
+# -- Dream scheduler ------------------------------------------------------------
 
 def start_dream_scheduler() {
     ::py::
@@ -107,7 +108,7 @@ def start_dream_scheduler() {
         while True:
             await asyncio.sleep(interval_s)
             try:
-                Dream().spawn(root)
+                Dream().spawn(root())
                 print("[dream] completed")
             except Exception as e:
                 print(f"[dream] error: {e}")
@@ -117,7 +118,7 @@ def start_dream_scheduler() {
     ::py::
 }
 
-# ── Main entry ────────────────────────────────────────────────────────────────
+# -- Main entry ----------------------------------------------------------------
 
 with entry {
     ::py::
@@ -125,10 +126,10 @@ with entry {
 
     cfg = load_config()
     ensure_workspace()
-    print(f"[graphclaw] starting — workspace: {cfg.workspace}")
+    print(f"[graphclaw] starting -- workspace: {cfg.workspace}")
 
     # Load skills into graph
-    LoadSkills().spawn(root)
+    LoadSkills().spawn(root())
     print("[graphclaw] skills loaded")
 
     # Start channels
@@ -152,7 +153,7 @@ with entry {
     if channels_started:
         print(f"[graphclaw] channels: {', '.join(channels_started)}")
     else:
-        print("[graphclaw] no channels enabled — running in CLI mode")
+        print("[graphclaw] no channels enabled -- running in CLI mode")
 
     # Start dispatch loop and dream scheduler
     start_dispatch_loop()

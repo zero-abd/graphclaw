@@ -1,7 +1,7 @@
 # graphclaw/channels/discord.jac
 
-import from graphclaw.channels.bus { bus, InboundMessage, OutboundMessage };
-import from graphclaw.config.loader { load_config };
+import from graphclaw.channels.bus { bus, InboundMessage, OutboundMessage }
+import from graphclaw.config.loader { load_config }
 
 def start_discord_channel() {
     ::py::

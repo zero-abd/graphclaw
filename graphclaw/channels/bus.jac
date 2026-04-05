@@ -1,9 +1,9 @@
 # graphclaw/channels/bus.jac
-# Async message bus — all channels publish/subscribe through this
+# Async message bus -- all channels publish/subscribe through this
 
-import from asyncio { Queue, get_event_loop };
-import from dataclasses { dataclass, field };
-import from typing { Optional, Callable, Awaitable };
+import from asyncio { Queue, get_event_loop }
+import from dataclasses { dataclass, field }
+import from typing { Optional, Callable, Awaitable }
 
 obj InboundMessage {
     has channel: str;
@@ -27,8 +27,8 @@ obj OutboundMessage {
 }
 
 obj MessageBus {
-    has _inbound: any = None;
-    has _outbound: any = None;
+    has _inbound: Any = None;
+    has _outbound: Any = None;
     has _handlers: dict = {};   # channel_name -> handler coroutine
 
     def postinit {
@@ -61,8 +61,8 @@ obj MessageBus {
         self._handlers[name] = handler;
     }
 
-    def get_inbound_queue() -> any { return self._inbound; }
-    def get_outbound_queue() -> any { return self._outbound; }
+    def get_inbound_queue() -> Any { return self._inbound; }
+    def get_outbound_queue() -> Any { return self._outbound; }
 }
 
 # Global bus singleton
