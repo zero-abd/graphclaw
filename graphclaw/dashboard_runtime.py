@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import time
+import tomllib
 import urllib.request
 import webbrowser
 from pathlib import Path
@@ -43,6 +44,10 @@ def _log_path() -> Path:
     path = _graphclaw_home() / "logs" / "dashboard-server.log"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _dashboard_client_dir() -> Path:
+    return _dashboard_project_root() / ".jac" / "client"
 
 
 def _dashboard_config() -> dict[str, Any]:
@@ -106,6 +111,23 @@ def _recent_log_excerpt() -> str:
     return excerpt
 
 
+def _ensure_dashboard_client_sync() -> None:
+    jac_toml = _dashboard_project_root() / "jac.toml"
+    package_json = _dashboard_client_dir() / "configs" / "package.json"
+    if not jac_toml.exists() or not package_json.exists():
+        return
+    try:
+        jac_data = tomllib.loads(jac_toml.read_text(encoding="utf-8"))
+        package_data = json.loads(package_json.read_text(encoding="utf-8"))
+    except Exception:
+        return
+
+    expected = set((jac_data.get("dependencies", {}) or {}).get("npm", {}).keys())
+    actual = set((package_data.get("dependencies") or {}).keys())
+    if expected - actual:
+        shutil.rmtree(_dashboard_client_dir(), ignore_errors=True)
+
+
 def _read_state() -> dict[str, Any]:
     path = _state_path()
     if not path.exists():
@@ -153,6 +175,7 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
             webbrowser.open(url)
         return url
 
+    _ensure_dashboard_client_sync()
     log_handle = _log_path().open("a", encoding="utf-8")
     env = _with_repo_on_pythonpath(dict(os.environ))
     env.setdefault("GRAPHCLAW_CONFIG_PATH", os.environ.get("GRAPHCLAW_CONFIG_PATH", ""))

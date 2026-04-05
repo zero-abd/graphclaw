@@ -72,3 +72,24 @@ def test_ensure_local_dashboard_launches_jac_from_dashboard_app(monkeypatch):
     assert recorded['cmd'] == ['jac', 'start', '--dev', '--port', '18789']
     assert recorded['cwd'] == '/tmp/repo/graphclaw/dashboard_app'
     assert recorded['env']['PYTHONPATH'].split(os.pathsep)[0] == '/tmp/repo'
+
+
+def test_dashboard_client_sync_clears_stale_generated_client(tmp_path, monkeypatch):
+    project_root = tmp_path / 'graphclaw' / 'dashboard_app'
+    client_dir = project_root / '.jac' / 'client'
+    configs_dir = client_dir / 'configs'
+    configs_dir.mkdir(parents=True)
+    (project_root / 'jac.toml').write_text(
+        '[dependencies.npm]\nreact = "^18.2.0"\nreact-force-graph-2d = "^1.29.1"\n',
+        encoding='utf-8',
+    )
+    (configs_dir / 'package.json').write_text(
+        '{"dependencies": {"react": "^18.2.0"}}',
+        encoding='utf-8',
+    )
+
+    monkeypatch.setattr(dashboard_runtime, '_dashboard_project_root', lambda: project_root)
+
+    dashboard_runtime._ensure_dashboard_client_sync()
+
+    assert not client_dir.exists()
