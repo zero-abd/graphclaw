@@ -273,23 +273,72 @@ case "$PROVIDER_CHOICE" in
 esac
 
 echo ""
-echo -e "  ${D}Messaging channels — all optional, press Enter to skip:${NC}"
+echo -e "  ${D}Pick the first chat interface you want to set up:${NC}"
+echo -e "  ${D}You can add more later by re-running install.sh or editing ~/.graphclaw/config.json.${NC}"
 echo ""
-hint "Telegram: open Telegram, message @BotFather, send /newbot"
-ask_optional "Telegram bot token"
-TG_TOKEN="$REPLY"
-hint "Discord: discord.com/developers/applications → New App → Bot → Reset Token"
-ask_optional "Discord bot token"
-DC_TOKEN="$REPLY"
-hint "Slack: api.slack.com/apps → Create App → OAuth & Permissions → Bot Token"
-ask_optional "Slack bot token (xoxb-...)"
-SL_BOT_TOKEN="$REPLY"
-SL_APP_TOKEN=""
-if [ -n "$SL_BOT_TOKEN" ]; then
-    hint "Slack app token: api.slack.com/apps → Basic Information → App-Level Tokens"
-    ask_required "Slack app token (xapp-...)"
-    SL_APP_TOKEN="$REPLY"
-fi
+echo -e "    ${W}1)${NC} ${BOLD}Telegram${NC}   ${D}— easiest for personal use${NC}"
+echo -e "    ${W}2)${NC} ${BOLD}Discord${NC}    ${D}— best for servers / communities${NC}"
+echo -e "    ${W}3)${NC} ${BOLD}Slack${NC}      ${D}— best for internal teams${NC}"
+echo -e "    ${W}4)${NC} ${BOLD}Skip for now${NC} ${D}— configure later${NC}"
+echo ""
+ask_choice "Select first chat interface [1-4]" "1 2 3 4" "1"
+CHANNEL_CHOICE="$REPLY"
+
+TG_TOKEN=""; DC_TOKEN=""; SL_BOT_TOKEN=""; SL_APP_TOKEN=""
+
+configure_telegram() {
+    echo ""
+    echo -e "  ${W}Telegram setup walkthrough${NC}"
+    hint "Open BotFather: https://t.me/BotFather"
+    hint "1. Send /newbot"
+    hint "2. Choose a display name for your bot"
+    hint "3. Choose a unique username ending in 'bot'"
+    hint "4. Copy the token BotFather gives you"
+    hint "5. Start a chat with your bot so it can message you back"
+    ask_optional "Paste Telegram bot token"
+    TG_TOKEN="$REPLY"
+    if [ -n "$TG_TOKEN" ]; then ok "Telegram configured"; fi
+}
+
+configure_discord() {
+    echo ""
+    echo -e "  ${W}Discord setup walkthrough${NC}"
+    hint "Open Discord Developer Portal: https://discord.com/developers/applications"
+    hint "1. Click New Application"
+    hint "2. Open the Bot tab and click Add Bot"
+    hint "3. Reset / copy the bot token"
+    hint "4. In Bot settings, enable Message Content Intent"
+    hint "5. In OAuth2 → URL Generator, select 'bot' scope and invite the bot to your server"
+    ask_optional "Paste Discord bot token"
+    DC_TOKEN="$REPLY"
+    if [ -n "$DC_TOKEN" ]; then ok "Discord configured"; fi
+}
+
+configure_slack() {
+    echo ""
+    echo -e "  ${W}Slack setup walkthrough${NC}"
+    hint "Open Slack app builder: https://api.slack.com/apps"
+    hint "1. Click Create New App"
+    hint "2. Add a bot user under App Home"
+    hint "3. In OAuth & Permissions, install the app and copy the Bot User OAuth Token (xoxb-...)"
+    hint "4. Enable Socket Mode"
+    hint "5. In Basic Information → App-Level Tokens, create a token with connections:write (xapp-...)"
+    hint "6. Invite the bot to the channel you want to use"
+    ask_optional "Paste Slack bot token (xoxb-...)"
+    SL_BOT_TOKEN="$REPLY"
+    if [ -n "$SL_BOT_TOKEN" ]; then
+        ask_required "Paste Slack app token (xapp-...)"
+        SL_APP_TOKEN="$REPLY"
+        ok "Slack configured"
+    fi
+}
+
+case "$CHANNEL_CHOICE" in
+    1) configure_telegram ;;
+    2) configure_discord ;;
+    3) configure_slack ;;
+    4) ok "Skipped messaging channels for now — add one later in ~/.graphclaw/config.json or by re-running install.sh" ;;
+esac
 
 echo ""
 echo -e "  ${D}DevOps skill API keys — all optional, press Enter to skip:${NC}"

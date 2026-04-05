@@ -333,21 +333,66 @@ switch ($ProviderChoice) {
 }
 
 Write-Host ""
-Write-Color "  Messaging channels (all optional -- skip any by pressing Enter):" DarkGray
+Write-Color "  Pick the first chat interface you want to set up:" DarkGray
+Write-Color "  You can add more later by re-running install.ps1 or editing ~/.graphclaw/config.json." DarkGray
+Write-Host ""
+Write-Color "    1)  Telegram   -- easiest for personal use" White
+Write-Color "    2)  Discord    -- best for servers / communities" White
+Write-Color "    3)  Slack      -- best for internal teams" White
+Write-Color "    4)  Skip for now -- configure later" White
 Write-Host ""
 
-hint "Telegram: open Telegram, message @BotFather, send /newbot"
-$TgToken = ask_optional "Telegram bot token"
+$ChannelChoice = ask_choice "Select first chat interface [1-4]" @("1","2","3","4") "1"
+$TgToken = ""; $DcToken = ""; $SlBotToken = ""; $SlAppToken = ""
 
-hint "Discord: discord.com/developers/applications -> New App -> Bot -> Reset Token"
-$DcToken = ask_optional "Discord bot token"
+function Configure-Telegram {
+    Write-Host ""
+    Write-Color "  Telegram setup walkthrough" White
+    hint "Open BotFather: https://t.me/BotFather"
+    hint "1. Send /newbot"
+    hint "2. Choose a display name for your bot"
+    hint "3. Choose a unique username ending in 'bot'"
+    hint "4. Copy the token BotFather gives you"
+    hint "5. Start a chat with your bot so it can message you back"
+    $script:TgToken = ask_optional "Paste Telegram bot token"
+    if ($script:TgToken) { ok "Telegram configured" }
+}
 
-hint "Slack: api.slack.com/apps -> Create App -> OAuth & Permissions -> Bot Token"
-$SlBotToken = ask_optional "Slack bot token (xoxb-...)"
-$SlAppToken = ""
-if ($SlBotToken) {
-    hint "Slack app token: api.slack.com/apps -> Your App -> Basic Information -> App-Level Tokens"
-    $SlAppToken = ask_required "Slack app token (xapp-...)"
+function Configure-Discord {
+    Write-Host ""
+    Write-Color "  Discord setup walkthrough" White
+    hint "Open Discord Developer Portal: https://discord.com/developers/applications"
+    hint "1. Click New Application"
+    hint "2. Open the Bot tab and click Add Bot"
+    hint "3. Reset / copy the bot token"
+    hint "4. In Bot settings, enable Message Content Intent"
+    hint "5. In OAuth2 -> URL Generator, select 'bot' scope and invite the bot to your server"
+    $script:DcToken = ask_optional "Paste Discord bot token"
+    if ($script:DcToken) { ok "Discord configured" }
+}
+
+function Configure-Slack {
+    Write-Host ""
+    Write-Color "  Slack setup walkthrough" White
+    hint "Open Slack app builder: https://api.slack.com/apps"
+    hint "1. Click Create New App"
+    hint "2. Add a bot user under App Home"
+    hint "3. In OAuth & Permissions, install the app and copy the Bot User OAuth Token (xoxb-...)"
+    hint "4. Enable Socket Mode"
+    hint "5. In Basic Information -> App-Level Tokens, create a token with connections:write (xapp-...)"
+    hint "6. Invite the bot to the channel you want to use"
+    $script:SlBotToken = ask_optional "Paste Slack bot token (xoxb-...)"
+    if ($script:SlBotToken) {
+        $script:SlAppToken = ask_required "Paste Slack app token (xapp-...)"
+        ok "Slack configured"
+    }
+}
+
+switch ($ChannelChoice) {
+    "1" { Configure-Telegram }
+    "2" { Configure-Discord }
+    "3" { Configure-Slack }
+    "4" { ok "Skipped messaging channels for now -- add one later in ~/.graphclaw/config.json or by re-running install.ps1" }
 }
 
 Write-Host ""
