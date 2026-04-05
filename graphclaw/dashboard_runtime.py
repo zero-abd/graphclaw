@@ -22,6 +22,10 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _dashboard_project_root() -> Path:
+    return Path(__file__).resolve().parent / "dashboard_app"
+
+
 def _graphclaw_home() -> Path:
     env = os.environ.get("GRAPHCLAW_HOME")
     if env:
@@ -67,6 +71,19 @@ def dashboard_api_url() -> str:
 def _jac_executable() -> str:
     jac = shutil.which("jac")
     return jac or "jac"
+
+
+def _with_repo_on_pythonpath(env: dict[str, str]) -> dict[str, str]:
+    updated = dict(env)
+    repo_root = str(_repo_root())
+    current = updated.get("PYTHONPATH", "")
+    if current:
+        entries = current.split(os.pathsep)
+        if repo_root not in entries:
+            updated["PYTHONPATH"] = os.pathsep.join([repo_root, *entries])
+    else:
+        updated["PYTHONPATH"] = repo_root
+    return updated
 
 
 def _is_dashboard_reachable(url: str, timeout: float = 0.4) -> bool:
@@ -137,13 +154,13 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
         return url
 
     log_handle = _log_path().open("a", encoding="utf-8")
-    env = dict(os.environ)
+    env = _with_repo_on_pythonpath(dict(os.environ))
     env.setdefault("GRAPHCLAW_CONFIG_PATH", os.environ.get("GRAPHCLAW_CONFIG_PATH", ""))
     env.setdefault("GRAPHCLAW_HOME", str(_graphclaw_home()))
-    cmd = [_jac_executable(), "start", "graphclaw/dashboard.jac", "--dev", "--port", str(cfg["port"])]
+    cmd = [_jac_executable(), "start", "--dev", "--port", str(cfg["port"])]
     proc = subprocess.Popen(
         cmd,
-        cwd=str(_repo_root()),
+        cwd=str(_dashboard_project_root()),
         env=env,
         stdout=log_handle,
         stderr=subprocess.STDOUT,

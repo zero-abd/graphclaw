@@ -1,4 +1,4 @@
-import "./dashboard.css";
+import "../dashboard.css";
 sv import from graphclaw.dashboard { dashboard_memory, dashboard_overview, OverviewResponse, MemoryResponse }
 
 
