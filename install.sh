@@ -22,23 +22,33 @@ info() { echo -e "  ${D}$1${NC}"; }
 hint() { echo -e "  ${D}    ↳ $1${NC}"; }
 
 ask_optional() {
+    REPLY=""
     echo -ne "  ${C}?${NC} ${BOLD}$1${NC} ${D}(optional, Enter to skip)${NC}: "
-    read -r REPLY
+    if ! read -r REPLY; then
+        REPLY=""
+    fi
 }
 ask_required() {
+    REPLY=""
     while true; do
         echo -ne "  ${C}?${NC} ${BOLD}$1${NC}: "
-        read -r REPLY
+        if ! read -r REPLY; then
+            fail "Input aborted."
+        fi
         [ -n "$REPLY" ] && return
         echo -e "  ${R}  Required — please enter a value.${NC}"
     done
 }
 ask_choice() {
     local prompt="$1" valid="$2" default="$3"
+    local answer=""
+    REPLY="$default"
     while true; do
         echo -ne "  ${C}?${NC} ${BOLD}$prompt${NC} ${D}[default: ${default}]${NC}: "
-        read -r REPLY
-        REPLY="${REPLY:-$default}"
+        if ! read -r answer; then
+            fail "Input aborted."
+        fi
+        REPLY="${answer:-$default}"
         for v in $valid; do [ "$REPLY" = "$v" ] && return; done
         echo -e "  ${R}  Invalid — enter one of: ${valid}${NC}"
     done
