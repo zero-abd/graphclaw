@@ -22,8 +22,8 @@ function info { Write-Color "  ... $args"  DarkGray }
 function fail { Write-Color "  [X] $args"  Red; exit 1 }
 function ask  {
     param([string]$Prompt, [string]$Default = "")
-    if ($Default) { Write-Host "  [?] $Prompt [$Default]: " -ForegroundColor Cyan -NoNewline }
-    else          { Write-Host "  [?] $Prompt: " -ForegroundColor Cyan -NoNewline }
+    if ($Default) { Write-Host "  [?] ${Prompt} [${Default}]: " -ForegroundColor Cyan -NoNewline }
+    else          { Write-Host "  [?] ${Prompt}: " -ForegroundColor Cyan -NoNewline }
     $r = Read-Host
     if (-not $r -and $Default) { $r = $Default }
     return $r
