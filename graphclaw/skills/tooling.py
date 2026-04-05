@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from graphclaw.skills.approval import propose_skill_install
 from graphclaw.skills.loader import (
     build_recommended_skills_summary,
     invoke_skill_async,
@@ -75,10 +76,46 @@ class InvokeSkillTool:
         )
 
 
+class RequestSkillInstallTool:
+    name = "request_skill_install"
+    description = "When installed skills are not enough, search ClawHub for a stronger matching skill and ask the user for approval before installing it."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "task": {"type": "string", "description": "Task or request that lacks a strong installed skill match"},
+            "limit": {"type": "integer", "description": "Maximum number of ClawHub matches to consider", "default": 3},
+        },
+        "required": ["task"],
+    }
+
+    def __init__(self, *, channel: str, chat_id: str, user_id: str):
+        self._channel = channel
+        self._chat_id = chat_id
+        self._user_id = user_id
+
+    async def execute(self, **kwargs: Any) -> str:
+        return await propose_skill_install(
+            str(kwargs.get("task", "")),
+            channel=self._channel,
+            chat_id=self._chat_id,
+            user_id=self._user_id,
+            limit=int(kwargs.get("limit", 3) or 3),
+        )
+
+
 def attach_skill_runtime(agent: Any) -> None:
     """Attach shared skill tools and task-aware prompt guidance to an agent instance."""
     existing = {getattr(tool, "name", "") for tool in getattr(agent, "tools", [])}
-    shared_tools = [ListSkillsTool(), RecommendSkillsTool(), InvokeSkillTool()]
+    shared_tools = [
+        ListSkillsTool(),
+        RecommendSkillsTool(),
+        InvokeSkillTool(),
+        RequestSkillInstallTool(
+            channel=str(getattr(agent, "channel", "cli") or "cli"),
+            chat_id=str(getattr(agent, "chat_id", "local") or "local"),
+            user_id=str(getattr(agent, "user_id", "user") or "user"),
+        ),
+    ]
     for tool in shared_tools:
         if tool.name not in existing:
             agent.tools.append(tool)
@@ -92,5 +129,8 @@ def attach_skill_runtime(agent: Any) -> None:
         agent.system_prompt
         + "\n\nInstalled skills most relevant to this task:\n"
         + build_recommended_skills_summary(query)
-        + "\n\nUse recommend_skills if you need to re-rank the options, and use invoke_skill to read the matching SKILL.md before improvising your own workflow."
+        + "\n\nUse recommend_skills if you need to re-rank the installed options. "
+        + "Use invoke_skill to read the matching SKILL.md before improvising your own workflow. "
+        + "If there is no strong installed skill match, use request_skill_install to search ClawHub and ask the user for approval before installing anything. "
+        + "Do not replace that approval flow with ad hoc search results."
     )
