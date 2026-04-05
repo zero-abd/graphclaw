@@ -50,7 +50,7 @@ edge HasSkill {}
 #   "author": "graphclaw",
 #   "tools": ["deploy_app", "get_app_status", "get_build_logs", "update_env_vars"],
 #   "requirements": [],
-#   "source_url": "https://github.com/zero-abd/graphclaw/tree/main/graphclaw/skills/registry/base44"
+#   "source_url": "https://clawhub.ai/skills/base44"
 # }
 
 glob BUILTIN_SKILLS_DIR: str = str(Path(__file__).parent / "registry");
