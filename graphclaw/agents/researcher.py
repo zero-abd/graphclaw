@@ -2,7 +2,7 @@
 from __future__ import annotations
 from graphclaw.agents.base import BaseAgent
 from graphclaw.tools.web import WebSearchTool, WebFetchTool
-from graphclaw.config.loader import load_config
+from graphclaw.skills.tooling import attach_skill_runtime
 
 
 class ResearcherAgent(BaseAgent):
@@ -16,3 +16,4 @@ class ResearcherAgent(BaseAgent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.tools = [WebSearchTool(), WebFetchTool()]
+        attach_skill_runtime(self)

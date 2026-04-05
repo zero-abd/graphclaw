@@ -9,17 +9,39 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+from graphclaw import dashboard as dashboard_mod
+from graphclaw import dashboard_data
 from graphclaw import dashboard_runtime as _dashboard_runtime
+from graphclaw import dashboard_server
 
 
 dashboard_runtime = importlib.reload(_dashboard_runtime)
 
 
-def test_dashboard_app_project_files_exist():
-    project_root = REPO_ROOT / 'graphclaw' / 'dashboard_app'
-    assert (project_root / 'jac.toml').exists()
-    assert (project_root / 'main.jac').exists()
-    assert (project_root / 'app.cl.jac').exists()
+def test_dashboard_data_helpers_are_importable():
+    assert callable(dashboard_mod.dashboard_overview)
+    assert callable(dashboard_mod.dashboard_memory)
+    assert callable(dashboard_mod.dashboard_save_settings)
+    assert callable(dashboard_data.dashboard_overview)
+
+
+def test_render_dashboard_html_contains_control_room(monkeypatch):
+    monkeypatch.setattr(
+        dashboard_server,
+        'dashboard_overview',
+        lambda: dashboard_data.OverviewResponse(assistant_name='Graphclaw', workspace='/tmp/workspace'),
+    )
+    monkeypatch.setattr(
+        dashboard_server,
+        'dashboard_memory',
+        lambda: dashboard_data.MemoryResponse(profile_json='{}'),
+    )
+
+    html = dashboard_server.render_dashboard_html()
+
+    assert 'Graphclaw Control' in html
+    assert 'Control Room' in html
+    assert '/dashboard.css' in html
 
 
 def test_with_repo_on_pythonpath_prepends_repo_root(monkeypatch):
@@ -28,13 +50,12 @@ def test_with_repo_on_pythonpath_prepends_repo_root(monkeypatch):
     assert env['PYTHONPATH'].split(os.pathsep)[0] == '/tmp/repo'
 
 
-def test_ensure_local_dashboard_launches_jac_from_dashboard_app(monkeypatch):
+def test_ensure_local_dashboard_launches_python_dashboard_server(monkeypatch):
     monkeypatch.setattr(
         dashboard_runtime,
         '_dashboard_config',
         lambda: {'enabled': True, 'auto_open': False, 'host': '127.0.0.1', 'port': 18789},
     )
-    monkeypatch.setattr(dashboard_runtime, '_dashboard_project_root', lambda: Path('/tmp/repo/graphclaw/dashboard_app'))
     monkeypatch.setattr(dashboard_runtime, '_repo_root', lambda: Path('/tmp/repo'))
     monkeypatch.setattr(dashboard_runtime, '_graphclaw_home', lambda: Path('/tmp/graphclaw-home'))
     monkeypatch.setattr(dashboard_runtime, '_cleanup_stale_state', lambda url: None)
@@ -43,7 +64,6 @@ def test_ensure_local_dashboard_launches_jac_from_dashboard_app(monkeypatch):
     monkeypatch.setattr(dashboard_runtime.time, 'sleep', lambda _: None)
     monkeypatch.setattr(dashboard_runtime, '_log_path', lambda: Path('/tmp/graphclaw-home/logs/dashboard-server.log'))
     monkeypatch.setattr(Path, 'open', lambda self, *args, **kwargs: io.StringIO(), raising=False)
-    monkeypatch.setattr(dashboard_runtime, '_jac_executable', lambda: 'jac')
 
     class FakeProc:
         pid = 4242
@@ -64,11 +84,10 @@ def test_ensure_local_dashboard_launches_jac_from_dashboard_app(monkeypatch):
         return FakeProc()
 
     monkeypatch.setattr(dashboard_runtime.subprocess, 'Popen', fake_popen)
-    monkeypatch.setattr(dashboard_runtime, '_is_dashboard_reachable', lambda url, timeout=0.4: url == 'http://127.0.0.1:18789/')
+    monkeypatch.setattr(dashboard_runtime, '_is_dashboard_reachable', lambda url, timeout=0.4: url.endswith('/'))
 
     url = dashboard_runtime.ensure_local_dashboard(open_browser=False)
 
     assert url == 'http://127.0.0.1:18789/'
-    assert recorded['cmd'] == ['jac', 'start', '--dev', '--port', '18789']
-    assert recorded['cwd'] == '/tmp/repo/graphclaw/dashboard_app'
+    assert recorded['cmd'][:3] == [sys.executable, '-m', 'graphclaw.dashboard_server']
     assert recorded['env']['PYTHONPATH'].split(os.pathsep)[0] == '/tmp/repo'

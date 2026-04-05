@@ -3,6 +3,7 @@ from __future__ import annotations
 from graphclaw.agents.base import BaseAgent
 from graphclaw.tools.filesystem import ReadFileTool, WriteFileTool
 from graphclaw.config.loader import load_config
+from graphclaw.skills.tooling import attach_skill_runtime
 
 
 class PlannerAgent(BaseAgent):
@@ -17,3 +18,4 @@ class PlannerAgent(BaseAgent):
         super().__init__(**kwargs)
         ws = load_config().workspace
         self.tools = [ReadFileTool(ws), WriteFileTool(ws)]
+        attach_skill_runtime(self)
