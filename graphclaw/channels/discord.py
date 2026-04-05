@@ -45,13 +45,9 @@ async def start_discord_channel() -> None:
     # Outbound send loop
     async def _send_loop() -> None:
         await client.wait_until_ready()
-        q = bus.get_outbound_queue()
+        q = bus.get_outbound_queue("discord")
         while True:
             msg: OutboundMessage = await q.get()
-            if msg.channel != "discord":
-                q.put_nowait(msg)
-                await asyncio.sleep(0.05)
-                continue
             try:
                 channel = client.get_channel(int(msg.chat_id))
                 if channel:

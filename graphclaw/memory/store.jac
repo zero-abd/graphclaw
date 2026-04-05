@@ -1,14 +1,7 @@
 # graphclaw/memory/store.jac
-# Walkers for writing to the memory graph
+# Walkers for writing to the memory/session store.
 
-import from graphclaw.memory.nodes {
-    Memory, Session, Topic, Turn, UserProfile,
-    MemoryType, Relates, Produced, Tagged, HasSession, HasMemory, HasTurn, HasProfile
-}
-import from datetime { datetime, timezone }
-import from uuid { uuid4 }
-
-# -- Store a memory node --------------------------------------------------------
+import from graphclaw.memory.nodes { MemoryType }
 
 walker StoreMemory {
     has content: str;
@@ -16,23 +9,24 @@ walker StoreMemory {
     has confidence: float = 1.0;
     has source_session: str = "";
     has agent: str = "";
-    has _result_id: str = "";
+    has topics: list[str] = [];
 
-    can store with `root() entry {
-        m = Memory(
+    can store with Root entry {
+        result_payload = None;
+        ::py::
+        from graphclaw.memory.backend import store_memory
+        result_payload = store_memory(
             content=self.content,
             mem_type=self.mem_type,
             confidence=self.confidence,
             source_session=self.source_session,
-            agent=self.agent
-        );
-        here +:HasMemory:+> m;
-        self._result_id = m.id;
-        report m.id;
+            agent=self.agent,
+            topics=list(self.topics),
+        )
+        ::py::
+        report result_payload;
     }
 }
-
-# -- Link two memories ----------------------------------------------------------
 
 walker LinkMemories {
     has from_id: str;
@@ -40,95 +34,85 @@ walker LinkMemories {
     has relationship: str = "related_to";
     has weight: float = 1.0;
 
-    can link with `root() entry {
-        mems = [here -->(:HasMemory:)--> (:Memory)][? id == self.from_id];
-        targets = [here -->(:HasMemory:)--> (:Memory)][? id == self.to_id];
-        if mems and targets {
-            mems[0] +:Relates(relationship=self.relationship, weight=self.weight):+> targets[0];
-            report True;
-        }
-        report False;
+    can link with Root entry {
+        result_payload = None;
+        ::py::
+        from graphclaw.memory.backend import link_memories
+        result_payload = link_memories(
+            from_id=self.from_id,
+            to_id=self.to_id,
+            relationship=self.relationship,
+            weight=self.weight,
+        )
+        ::py::
+        report result_payload;
     }
 }
-
-# -- Tag a memory with a topic --------------------------------------------------
 
 walker TagMemory {
     has memory_id: str;
     has topic_name: str;
 
-    can tag with `root() entry {
-        mems = [here -->(:HasMemory:)--> (:Memory)][? id == self.memory_id];
-        if not mems { report False; disengage; }
-        mem = mems[0];
-
-        # Reuse existing topic node or create one
-        existing_topics = [here -->][?:Topic][? name == self.topic_name];
-        if existing_topics {
-            topic = existing_topics[0];
-        } else {
-            topic = Topic(name=self.topic_name);
-            here ++> topic;
-        }
-        topic +:Tagged:+> mem;
-        report True;
+    can tag with Root entry {
+        result_payload = None;
+        ::py::
+        from graphclaw.memory.backend import tag_memory
+        result_payload = tag_memory(memory_id=self.memory_id, topic_name=self.topic_name)
+        ::py::
+        report result_payload;
     }
 }
-
-# -- Revalidate (reset decay clock) --------------------------------------------
 
 walker RevalidateMemory {
     has memory_id: str;
 
-    can revalidate with `root() entry {
-        mems = [here -->(:HasMemory:)--> (:Memory)][? id == self.memory_id];
-        if mems {
-            mems[0].touch();
-            report True;
-        }
-        report False;
+    can revalidate with Root entry {
+        result_payload = None;
+        ::py::
+        from graphclaw.memory.backend import revalidate_memory
+        result_payload = revalidate_memory(memory_id=self.memory_id)
+        ::py::
+        report result_payload;
     }
 }
-
-# -- Tombstone (soft-delete) ----------------------------------------------------
 
 walker TombstoneMemory {
     has memory_id: str;
 
-    can tombstone with `root() entry {
-        mems = [here -->(:HasMemory:)--> (:Memory)][? id == self.memory_id];
-        if mems {
-            mems[0].tombstoned = True;
-            mems[0].updated_at = datetime.now(timezone.utc).isoformat();
-            report True;
-        }
-        report False;
+    can tombstone with Root entry {
+        result_payload = None;
+        ::py::
+        from graphclaw.memory.backend import tombstone_memory
+        result_payload = tombstone_memory(memory_id=self.memory_id)
+        ::py::
+        report result_payload;
     }
 }
-
-# -- Record a session -----------------------------------------------------------
 
 walker StartSession {
     has channel: str;
     has chat_id: str;
+    has session_id: str = "";
     has user_id: str = "";
     has agent: str = "coordinator";
     has model: str = "";
 
-    can start with `root() entry {
-        s = Session(
+    can start with Root entry {
+        result_payload = None;
+        ::py::
+        from graphclaw.memory.backend import start_session
+        result_payload = start_session(
+            session_id=self.session_id,
             channel=self.channel,
             chat_id=self.chat_id,
             user_id=self.user_id,
             agent=self.agent,
-            model=self.model
-        );
-        here +:HasSession:+> s;
-        report s.session_id;
+            model=self.model,
+        )
+        ::py::
+        report result_payload;
     }
 }
-
-# -- Append a turn to an existing session --------------------------------------
 
 walker AppendTurn {
     has session_id: str;
@@ -138,42 +122,38 @@ walker AppendTurn {
     has tool_result: str = "";
     has token_count: int = 0;
 
-    can append with `root() entry {
-        sessions = [here -->(:HasSession:)--> (:Session)][? session_id == self.session_id];
-        if not sessions { report None; disengage; }
-        s = sessions[0];
-        t = Turn(
+    can append with Root entry {
+        result_payload = None;
+        ::py::
+        from graphclaw.memory.backend import append_turn
+        result_payload = append_turn(
+            session_id=self.session_id,
             role=self.role,
             content=self.content,
             tool_name=self.tool_name,
             tool_result=self.tool_result,
-            token_count=self.token_count
-        );
-        s +:HasTurn:+> t;
-        s +:Produced:+> t;
-        s.turns += 1;
-        report t.turn_id;
+            token_count=self.token_count,
+        )
+        ::py::
+        report result_payload;
     }
 }
 
-# -- Upsert user profile --------------------------------------------------------
-
 walker UpsertProfile {
     has display_name: str = "";
-    has timezone: str = "UTC";
+    has timezone_name: str = "UTC";
     has preferred_model: str = "";
 
-    can upsert with `root() entry {
-        profiles = [here -->(:HasProfile:)--> (:UserProfile)];
-        if profiles {
-            p = profiles[0];
-        } else {
-            p = UserProfile();
-            here +:HasProfile:+> p;
-        }
-        if self.display_name { p.display_name = self.display_name; }
-        if self.timezone { p.timezone = self.timezone; }
-        if self.preferred_model { p.preferred_model = self.preferred_model; }
-        report p;
+    can upsert with Root entry {
+        result_payload = None;
+        ::py::
+        from graphclaw.memory.backend import upsert_profile
+        result_payload = upsert_profile(
+            display_name=self.display_name,
+            timezone_name=self.timezone_name,
+            preferred_model=self.preferred_model,
+        )
+        ::py::
+        report result_payload;
     }
 }

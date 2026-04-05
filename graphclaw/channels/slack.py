@@ -48,13 +48,9 @@ async def start_slack_channel() -> None:
     async def _send_loop() -> None:
         from slack_sdk.web.async_client import AsyncWebClient
         client = AsyncWebClient(token=bot_token)
-        q = bus.get_outbound_queue()
+        q = bus.get_outbound_queue("slack")
         while True:
             msg: OutboundMessage = await q.get()
-            if msg.channel != "slack":
-                q.put_nowait(msg)
-                await asyncio.sleep(0.05)
-                continue
             try:
                 thread_ts = msg.metadata.get("thread_ts")
                 await client.chat_postMessage(

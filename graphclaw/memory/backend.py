@@ -1,0 +1,517 @@
+"""Workspace-backed memory/session helpers used by the Jac wrappers.
+
+This keeps Graphclaw runnable on the current Jac toolchain while preserving the
+same high-level memory/session API surface for the rest of the app.
+"""
+from __future__ import annotations
+
+import json
+import re
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, Iterable, List
+
+from graphclaw.config.loader import ensure_workspace, load_config
+
+
+MEMORY_FILE = "memories.json"
+PROFILE_FILE = "profile.json"
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _workspace() -> Path:
+    ensure_workspace()
+    return Path(load_config().workspace)
+
+
+def _memory_dir() -> Path:
+    path = _workspace() / "memory"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _session_dir() -> Path:
+    path = _workspace() / "sessions"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _load_json(path: Path, default: Any) -> Any:
+    if not path.exists():
+        return default
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return default
+
+
+def _save_json(path: Path, data: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _memory_path() -> Path:
+    return _memory_dir() / MEMORY_FILE
+
+
+def _profile_path() -> Path:
+    return _memory_dir() / PROFILE_FILE
+
+
+def _session_path(session_id: str) -> Path:
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", session_id)
+    return _session_dir() / f"{safe}.json"
+
+
+def _load_memories() -> List[Dict[str, Any]]:
+    data = _load_json(_memory_path(), [])
+    return data if isinstance(data, list) else []
+
+
+def _save_memories(memories: List[Dict[str, Any]]) -> None:
+    _save_json(_memory_path(), memories)
+
+
+def _load_session(session_id: str) -> Dict[str, Any] | None:
+    data = _load_json(_session_path(session_id), None)
+    return data if isinstance(data, dict) else None
+
+
+def _save_session(session: Dict[str, Any]) -> None:
+    _save_json(_session_path(str(session["session_id"])), session)
+
+
+def _effective_confidence(memory: Dict[str, Any]) -> float:
+    confidence = float(memory.get("confidence", 1.0))
+    decay_rate = float(memory.get("decay_rate", 0.01))
+    last_validated_at = memory.get("last_validated_at") or memory.get("updated_at") or _now()
+    try:
+        last = datetime.fromisoformat(last_validated_at)
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        days = max((now - last).total_seconds(), 0.0) / 86400.0
+        return max(0.0, min(1.0, confidence - (decay_rate * days)))
+    except Exception:
+        return max(0.0, min(1.0, confidence))
+
+
+def _memory_topics(memory: Dict[str, Any]) -> List[str]:
+    topics = memory.get("topics", [])
+    if not isinstance(topics, list):
+        return []
+    return [str(topic).strip().lower() for topic in topics if str(topic).strip()]
+
+
+def _iter_live_memories() -> Iterable[Dict[str, Any]]:
+    for memory in _load_memories():
+        if not memory.get("tombstoned"):
+            yield memory
+
+
+def _ensure_memory_relationships(memory: Dict[str, Any]) -> List[Dict[str, Any]]:
+    rels = memory.get("relationships", [])
+    if not isinstance(rels, list):
+        rels = []
+        memory["relationships"] = rels
+    return rels
+
+
+def list_sessions(unconsolidated_only: bool = False) -> List[Dict[str, Any]]:
+    sessions: List[Dict[str, Any]] = []
+    for path in sorted(_session_dir().glob("*.json")):
+        data = _load_json(path, None)
+        if not isinstance(data, dict):
+            continue
+        if unconsolidated_only and data.get("consolidated"):
+            continue
+        sessions.append(data)
+    sessions.sort(key=lambda item: item.get("started_at", ""))
+    return sessions
+
+
+def start_session(
+    channel: str,
+    chat_id: str,
+    user_id: str = "",
+    agent: str = "coordinator",
+    model: str = "",
+    session_id: str = "",
+) -> str:
+    resolved_session_id = session_id or str(uuid.uuid4())
+    session = {
+        "session_id": resolved_session_id,
+        "channel": channel,
+        "chat_id": chat_id,
+        "user_id": user_id,
+        "agent": agent,
+        "model": model,
+        "started_at": _now(),
+        "turns": [],
+        "turn_count": 0,
+        "consolidated": False,
+    }
+    _save_session(session)
+    return resolved_session_id
+
+
+def append_turn(
+    session_id: str,
+    role: str,
+    content: str,
+    tool_name: str = "",
+    tool_result: str = "",
+    token_count: int = 0,
+) -> str | None:
+    session = _load_session(session_id)
+    if not session:
+        return None
+
+    turn_id = str(uuid.uuid4())
+    turn = {
+        "turn_id": turn_id,
+        "role": role,
+        "content": content,
+        "tool_name": tool_name,
+        "tool_result": tool_result,
+        "timestamp": _now(),
+        "token_count": token_count,
+    }
+    session.setdefault("turns", []).append(turn)
+    session["turn_count"] = len(session["turns"])
+    session["consolidated"] = False
+    _save_session(session)
+    return turn_id
+
+
+def store_memory(
+    content: str,
+    mem_type: str = "User",
+    confidence: float = 1.0,
+    source_session: str = "",
+    agent: str = "",
+    topics: List[str] | None = None,
+) -> str:
+    normalized = content.strip()
+    if not normalized:
+        raise ValueError("memory content cannot be empty")
+
+    memories = _load_memories()
+    now = _now()
+    new_topics = {topic.strip().lower() for topic in (topics or []) if topic.strip()}
+
+    for memory in memories:
+        if memory.get("content", "").strip() == normalized and not memory.get("tombstoned"):
+            memory["confidence"] = max(float(memory.get("confidence", 1.0)), float(confidence))
+            memory["updated_at"] = now
+            memory["last_validated_at"] = now
+            if source_session:
+                memory["source_session"] = source_session
+            if agent:
+                memory["agent"] = agent
+            if new_topics:
+                memory["topics"] = sorted(set(_memory_topics(memory)) | new_topics)
+            _save_memories(memories)
+            return str(memory["id"])
+
+    memory_id = str(uuid.uuid4())
+    memories.append(
+        {
+            "id": memory_id,
+            "content": normalized,
+            "mem_type": mem_type,
+            "confidence": float(confidence),
+            "decay_rate": 0.01,
+            "created_at": now,
+            "updated_at": now,
+            "last_validated_at": now,
+            "source_session": source_session,
+            "agent": agent,
+            "tombstoned": False,
+            "topics": sorted(new_topics),
+            "relationships": [],
+        }
+    )
+    _save_memories(memories)
+    return memory_id
+
+
+def link_memories(from_id: str, to_id: str, relationship: str = "related_to", weight: float = 1.0) -> bool:
+    memories = _load_memories()
+    lookup = {memory.get("id"): memory for memory in memories}
+    if from_id not in lookup or to_id not in lookup:
+        return False
+    rels = _ensure_memory_relationships(lookup[from_id])
+    pair = {"to": to_id, "relationship": relationship, "weight": float(weight)}
+    if pair not in rels:
+        rels.append(pair)
+        lookup[from_id]["updated_at"] = _now()
+        _save_memories(memories)
+    return True
+
+
+def tag_memory(memory_id: str, topic_name: str) -> bool:
+    topic = topic_name.strip().lower()
+    if not topic:
+        return False
+    memories = _load_memories()
+    for memory in memories:
+        if memory.get("id") == memory_id and not memory.get("tombstoned"):
+            topics = set(_memory_topics(memory))
+            topics.add(topic)
+            memory["topics"] = sorted(topics)
+            memory["updated_at"] = _now()
+            _save_memories(memories)
+            return True
+    return False
+
+
+def revalidate_memory(memory_id: str) -> bool:
+    memories = _load_memories()
+    for memory in memories:
+        if memory.get("id") == memory_id and not memory.get("tombstoned"):
+            memory["last_validated_at"] = _now()
+            memory["updated_at"] = memory["last_validated_at"]
+            _save_memories(memories)
+            return True
+    return False
+
+
+def tombstone_memory(memory_id: str) -> bool:
+    memories = _load_memories()
+    for memory in memories:
+        if memory.get("id") == memory_id and not memory.get("tombstoned"):
+            memory["tombstoned"] = True
+            memory["updated_at"] = _now()
+            _save_memories(memories)
+            return True
+    return False
+
+
+def upsert_profile(display_name: str = "", timezone_name: str = "UTC", preferred_model: str = "") -> Dict[str, Any]:
+    profile = _load_json(_profile_path(), {})
+    if not isinstance(profile, dict):
+        profile = {}
+    profile.setdefault("created_at", _now())
+    if display_name:
+        profile["display_name"] = display_name
+    if timezone_name:
+        profile["timezone"] = timezone_name
+    if preferred_model:
+        profile["preferred_model"] = preferred_model
+    _save_json(_profile_path(), profile)
+    return profile
+
+
+def recall(
+    query: str,
+    limit: int = 10,
+    semantic: bool = False,
+    mem_type: str = "",
+    min_confidence: float = 0.1,
+) -> List[Dict[str, Any]]:
+    query_lower = query.lower().strip()
+    matches: List[Dict[str, Any]] = []
+    for memory in _iter_live_memories():
+        if mem_type and memory.get("mem_type") != mem_type:
+            continue
+        confidence = _effective_confidence(memory)
+        if confidence < min_confidence:
+            continue
+        content = str(memory.get("content", ""))
+        if query_lower and query_lower not in content.lower() and not semantic:
+            continue
+        matches.append(
+            {
+                "id": memory.get("id", ""),
+                "content": content,
+                "mem_type": memory.get("mem_type", "User"),
+                "confidence": confidence,
+                "topics": _memory_topics(memory),
+            }
+        )
+    matches.sort(key=lambda item: item["confidence"], reverse=True)
+    return matches[:limit]
+
+
+def recall_by_type(mem_type: str, limit: int = 20) -> List[Dict[str, Any]]:
+    return recall(query="", limit=limit, semantic=False, mem_type=mem_type, min_confidence=0.0)
+
+
+def recall_by_topic(topic_name: str, limit: int = 20) -> List[Dict[str, Any]]:
+    topic = topic_name.strip().lower()
+    matches: List[Dict[str, Any]] = []
+    for memory in _iter_live_memories():
+        if topic and topic not in _memory_topics(memory):
+            continue
+        matches.append(
+            {
+                "id": memory.get("id", ""),
+                "content": memory.get("content", ""),
+                "confidence": _effective_confidence(memory),
+                "mem_type": memory.get("mem_type", "User"),
+                "topics": _memory_topics(memory),
+            }
+        )
+    matches.sort(key=lambda item: item["confidence"], reverse=True)
+    return matches[:limit]
+
+
+def recall_session(session_id: str, last_n: int = 50) -> List[Dict[str, Any]]:
+    session = _load_session(session_id)
+    if not session:
+        return []
+    turns = session.get("turns", [])[-last_n:]
+    result: List[Dict[str, Any]] = []
+    for turn in turns:
+        if not isinstance(turn, dict):
+            continue
+        result.append(
+            {
+                "role": turn.get("role", ""),
+                "content": turn.get("content", ""),
+                "timestamp": turn.get("timestamp", ""),
+            }
+        )
+    return result
+
+
+def get_memory_context(max_chars: int = 4000) -> str:
+    live = list(_iter_live_memories())
+    live.sort(key=_effective_confidence, reverse=True)
+    lines: List[str] = []
+    total = 0
+    for memory in live:
+        line = f"[{memory.get('mem_type', 'User')}] {memory.get('content', '')}".strip()
+        if not line:
+            continue
+        if total + len(line) > max_chars:
+            break
+        lines.append(line)
+        total += len(line)
+    return "\n".join(lines)
+
+
+def _extract_topics(text: str) -> List[str]:
+    tokens = [token.lower() for token in re.findall(r"[A-Za-z][A-Za-z0-9_-]{2,}", text)]
+    stopwords = {
+        "the", "and", "that", "with", "from", "this", "have", "your", "into", "about", "there",
+        "would", "could", "should", "what", "when", "where", "while", "they", "them", "their",
+        "project", "graphclaw", "assistant", "please", "thanks",
+    }
+    seen: List[str] = []
+    for token in tokens:
+        if token in stopwords or token in seen:
+            continue
+        seen.append(token)
+        if len(seen) >= 3:
+            break
+    return seen
+
+
+def consolidate_session(session_id: str) -> str | None:
+    session = _load_session(session_id)
+    if not session or session.get("consolidated"):
+        return None
+
+    turns = session.get("turns", [])
+    if not turns:
+        session["consolidated"] = True
+        _save_session(session)
+        return None
+
+    saved = 0
+    for turn in turns:
+        if not isinstance(turn, dict):
+            continue
+        role = turn.get("role", "")
+        content = str(turn.get("content", "")).strip()
+        if role not in {"user", "assistant"} or not content:
+            continue
+        mem_type = "Project" if role == "assistant" else "User"
+        store_memory(
+            content=content[:500],
+            mem_type=mem_type,
+            confidence=0.6 if role == "assistant" else 0.7,
+            source_session=session_id,
+            agent=session.get("agent", "coordinator"),
+            topics=_extract_topics(content),
+        )
+        saved += 1
+
+    session["consolidated"] = True
+    _save_session(session)
+    return f"Consolidated {saved} turns from session {session_id}."
+
+
+def consolidate_all(max_sessions: int = 10) -> List[str]:
+    summaries: List[str] = []
+    for session in list_sessions(unconsolidated_only=True)[:max_sessions]:
+        summary = consolidate_session(str(session.get("session_id", "")))
+        if summary:
+            summaries.append(summary)
+    return summaries
+
+
+def dream_run(max_memories: int = 100, dry_run: bool = False) -> Dict[str, Any]:
+    consolidate_all(max_sessions=20)
+
+    memories = _load_memories()
+    live = [memory for memory in memories if not memory.get("tombstoned")][:max_memories]
+
+    tombstoned = 0
+    revalidated = 0
+    linked = 0
+    tagged = 0
+
+    for memory in live:
+        if _effective_confidence(memory) <= 0.0:
+            tombstoned += 1
+            if not dry_run:
+                memory["tombstoned"] = True
+                memory["updated_at"] = _now()
+
+    live = [memory for memory in live if not memory.get("tombstoned")]
+
+    for memory in live:
+        if 0.2 <= _effective_confidence(memory) <= 0.6:
+            revalidated += 1
+            if not dry_run:
+                memory["last_validated_at"] = _now()
+                memory["updated_at"] = memory["last_validated_at"]
+
+        if not _memory_topics(memory):
+            tags = _extract_topics(str(memory.get("content", "")))
+            if tags:
+                tagged += len(tags)
+                if not dry_run:
+                    memory["topics"] = tags
+                    memory["updated_at"] = _now()
+
+    for index, memory in enumerate(live):
+        for other in live[index + 1:index + 4]:
+            if memory.get("content") == other.get("content"):
+                continue
+            rels = _ensure_memory_relationships(memory)
+            pair = {"to": other.get("id", ""), "relationship": "related_to", "weight": 0.5}
+            if pair not in rels:
+                linked += 1
+                if not dry_run:
+                    rels.append(pair)
+                    memory["updated_at"] = _now()
+
+    if not dry_run:
+        _save_memories(memories)
+
+    return {
+        "tombstoned": tombstoned,
+        "merged": 0,
+        "revalidated": revalidated,
+        "linked": linked,
+        "tagged": tagged,
+        "timestamp": _now(),
+    }

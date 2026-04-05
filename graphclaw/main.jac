@@ -1,6 +1,5 @@
 # graphclaw/main.jac
-# Entry point -- starts all channels and the agent dispatch loop
-# Memory layer is Jac (graph-native), everything else is Python
+# Entry point -- starts all channels and the agent dispatch loop.
 
 import from graphclaw.config.loader { load_config, ensure_workspace }
 import from graphclaw.channels.bus { bus, InboundMessage, OutboundMessage }
@@ -9,55 +8,63 @@ import from graphclaw.channels.discord { start_discord_channel }
 import from graphclaw.channels.slack { start_slack_channel }
 import from graphclaw.channels.email { start_email_channel }
 import from graphclaw.channels.whatsapp { start_whatsapp_channel }
-import from graphclaw.memory.store { StartSession, AppendTurn }
-import from graphclaw.memory.recall { GetMemoryContext }
 import from graphclaw.memory.dream { Dream }
-import from graphclaw.memory.consolidate { ConsolidateAll }
 
-# -- Agent dispatch ----------------------------------------------------------------
 
 def dispatch_message(msg: InboundMessage) {
     ::py::
-    import asyncio, traceback
+    import asyncio
+    import traceback
+
     from graphclaw.agents.coordinator import CoordinatorAgent
+    from graphclaw.memory.backend import append_turn, consolidate_session, get_memory_context, start_session
+
+    def _extract_content(result: object) -> str:
+        if result is None:
+            return "[No response]"
+        if hasattr(result, "content"):
+            return result.content or "[No response]"
+        if isinstance(result, dict):
+            return result.get("content", str(result))
+        return str(result)
 
     async def _handle():
+        session_id = ""
         try:
-            # Spawn coordinator walker on root to get intent routing + graph access
+            session_id = start_session(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                user_id=msg.user_id,
+                agent="coordinator",
+            )
+            append_turn(session_id=session_id, role="user", content=msg.text)
+
+            memory_context = get_memory_context(max_chars=3000)
+            query = msg.text
+            if memory_context:
+                query = f"Memory context:\n{memory_context}\n\nUser message:\n{msg.text}"
+
             result = CoordinatorAgent(
-                query=msg.text,
+                query=query,
                 channel=msg.channel,
                 chat_id=msg.chat_id,
-                user_id=msg.user_id
+                user_id=msg.user_id,
             ).spawn(root())
+            content = _extract_content(result)
 
-            content = "[No response]"
-            if result:
-                if hasattr(result, 'content'):
-                    content = result.content
-                elif isinstance(result, dict):
-                    content = result.get('content', str(result))
-                else:
-                    content = str(result)
-
-            bus.publish_outbound(OutboundMessage(
-                channel=msg.channel,
-                chat_id=msg.chat_id,
-                text=content
-            ))
+            append_turn(session_id=session_id, role="assistant", content=content)
+            consolidate_session(session_id)
+            bus.publish_outbound(OutboundMessage(channel=msg.channel, chat_id=msg.chat_id, text=content))
         except Exception as e:
-            bus.publish_outbound(OutboundMessage(
-                channel=msg.channel,
-                chat_id=msg.chat_id,
-                text=f"[Error] {str(e)}"
-            ))
+            if session_id:
+                append_turn(session_id=session_id, role="assistant", content=f"[Error] {e}")
+            bus.publish_outbound(OutboundMessage(channel=msg.channel, chat_id=msg.chat_id, text=f"[Error] {str(e)}"))
             traceback.print_exc()
 
     asyncio.ensure_future(_handle())
     ::py::
 }
 
-# -- Inbound message consumer ------------------------------------------------------
 
 def start_dispatch_loop() {
     ::py::
@@ -76,7 +83,6 @@ def start_dispatch_loop() {
     ::py::
 }
 
-# -- Dream scheduler ---------------------------------------------------------------
 
 def start_dream_scheduler() {
     ::py::
@@ -98,17 +104,15 @@ def start_dream_scheduler() {
     ::py::
 }
 
-# -- Main entry --------------------------------------------------------------------
 
 with entry {
     ::py::
-    import asyncio, sys
+    import asyncio
 
     cfg = load_config()
     ensure_workspace()
     print(f"[graphclaw] starting -- workspace: {cfg.workspace}")
 
-    # Start channels
     channels_started = []
 
     async def _start_channels():
@@ -129,21 +133,20 @@ with entry {
             await start_whatsapp_channel()
             channels_started.append("whatsapp")
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     loop.run_until_complete(_start_channels())
 
     if channels_started:
-        print(f"[graphclaw] channels: {', '.join(channels_started)}")
+        print("[graphclaw] channels: " + ", ".join(channels_started))
     else:
         print("[graphclaw] no channels enabled -- running in CLI mode")
 
-    # Start dispatch loop and dream scheduler
     start_dispatch_loop()
     start_dream_scheduler()
 
     print("[graphclaw] ready")
 
-    # CLI mode: read from stdin if no channels
     if not channels_started:
         async def cli_loop():
             print("Type your message (Ctrl+C to exit):")
@@ -151,21 +154,15 @@ with entry {
                 try:
                     text = await loop.run_in_executor(None, input, "> ")
                     if text.strip():
-                        bus.publish_inbound(InboundMessage(
-                            channel="cli",
-                            chat_id="local",
-                            user_id="user",
-                            text=text.strip()
-                        ))
-                        # Wait for response
-                        await asyncio.sleep(0.5)
-                        q = bus.get_outbound_queue()
-                        while not q.empty():
-                            out = await q.get()
-                            print(f"\n{out.text}\n")
+                        bus.publish_inbound(InboundMessage(channel="cli", chat_id="local", user_id="user", text=text.strip()))
+                        q = bus.get_outbound_queue("cli")
+                        out = await q.get()
+                        print(f"\n{out.text}\n")
                 except (EOFError, KeyboardInterrupt):
                     print("\n[graphclaw] bye")
-                    sys.exit(0)
+                    loop.stop()
+                    return
+
         asyncio.ensure_future(cli_loop())
 
     try:

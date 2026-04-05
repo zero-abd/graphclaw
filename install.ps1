@@ -227,7 +227,7 @@ info "Upgrading pip..."
 & $VenvPython -m pip install --upgrade pip -q 2>&1 | Out-Null
 
 info "Installing jaclang (Jac runtime)..."
-$jacOut = & $VenvPip install "jaclang>=0.6.1" 2>&1
+$jacOut = & $VenvPip install "jaclang>=0.13.5,<0.14" 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Color "  pip output:" DarkGray
     $jacOut | ForEach-Object { Write-Color "    $_" DarkGray }
@@ -418,13 +418,13 @@ ok ".env written to $EnvFile"
 # run.bat — activates venv, sets config path, runs jac
 $RunBat = "$GraphclawDir\run.bat"
 $MainJac = "$ScriptDir\graphclaw\main.jac"
-$RunBatContent = "@echo off`r`ncall `"$VenvDir\Scripts\activate.bat`"`r`nset GRAPHCLAW_CONFIG_PATH=$ConfigFile`r`njac run `"$MainJac`" %*`r`n"
+$RunBatContent = "@echo off`r`ncall `"$VenvDir\Scripts\activate.bat`"`r`nset GRAPHCLAW_CONFIG_PATH=$ConfigFile`r`njac run --no-autonative `"$MainJac`" %*`r`n"
 Write-NoBom $RunBat $RunBatContent
 ok "Startup script: $RunBat"
 
 # run.ps1 — PowerShell equivalent (activates venv, runs jac)
 $RunPs1 = "$GraphclawDir\run.ps1"
-$RunPs1Content = "& `"$VenvDir\Scripts\Activate.ps1`"`r`n`$env:GRAPHCLAW_CONFIG_PATH = `"$ConfigFile`"`r`njac run `"$MainJac`" @args`r`n"
+$RunPs1Content = "& `"$VenvDir\Scripts\Activate.ps1`"`r`n`$env:GRAPHCLAW_CONFIG_PATH = `"$ConfigFile`"`r`njac run --no-autonative `"$MainJac`" @args`r`n"
 Write-NoBom $RunPs1 $RunPs1Content
 ok "PowerShell startup: $RunPs1"
 

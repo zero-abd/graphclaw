@@ -18,7 +18,7 @@ async def start_email_channel() -> None:
     password = ch.get("password", "")
     poll_interval = ch.get("poll_interval", 30)
 
-    if not all([imap_host, username, password]):
+    if not all([imap_host, smtp_host, username, password]):
         print("[email] incomplete config, skipping")
         return
 
@@ -67,13 +67,9 @@ async def start_email_channel() -> None:
         import smtplib
         from email.mime.text import MIMEText
 
-        q = bus.get_outbound_queue()
+        q = bus.get_outbound_queue("email")
         while True:
             msg: OutboundMessage = await q.get()
-            if msg.channel != "email":
-                q.put_nowait(msg)
-                await asyncio.sleep(0.05)
-                continue
             try:
                 mime = MIMEText(msg.text)
                 mime["From"] = username
