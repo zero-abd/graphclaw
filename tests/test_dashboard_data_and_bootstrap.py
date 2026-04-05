@@ -33,6 +33,13 @@ def _write_config(tmp_path: Path) -> Path:
                     'email': {'enabled': False},
                     'whatsapp': {'enabled': False},
                 },
+                'mcpServers': {
+                    'filesystem': {
+                        'enabled': True,
+                        'command': 'npx',
+                        'args': ['-y', '@modelcontextprotocol/server-filesystem', str(tmp_path)],
+                    }
+                },
                 'dashboard': {'enabled': True, 'auto_open': False, 'host': '127.0.0.1', 'port': 18789},
             }
         ),
@@ -69,12 +76,18 @@ def test_bootstrap_creates_root_identity_memory(monkeypatch, tmp_path):
         'assistant_skills_clawhub',
         'assistant_skills_workspace',
         'assistant_skills_shared',
+        'assistant_mcp_root',
+        'assistant_mcp_servers',
+        'assistant_mcp_tools',
+        'assistant_mcp_resources',
+        'assistant_mcp_prompts',
+        'assistant_mcp_server_filesystem',
     } <= system_keys
     assert any(str(key).startswith('assistant_skill_') for key in system_keys if key)
 
     root = next(memory for memory in memories if memory.get('system_key') == 'assistant_root')
     relationships = {item['relationship'] for item in root.get('relationships', [])}
-    assert {'has_name', 'has_identity', 'has_soul', 'runs_dream_cycle', 'has_skills'} <= relationships
+    assert {'has_name', 'has_identity', 'has_soul', 'runs_dream_cycle', 'has_skills', 'has_mcp'} <= relationships
 
 
 def test_dashboard_overview_reports_skill_and_identity_state(monkeypatch, tmp_path):
