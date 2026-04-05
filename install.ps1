@@ -21,13 +21,21 @@ function ok   { param([string]$Msg) Write-Color "  [OK] $Msg" Green }
 function warn { param([string]$Msg) Write-Color "  [!!] $Msg" Yellow }
 function info { param([string]$Msg) Write-Color "  ...  $Msg" DarkGray }
 function fail { param([string]$Msg) Write-Color "  [X]  $Msg" Red; exit 1 }
+function hint { param([string]$Msg) Write-Color "       $Msg" DarkGray }
+
+# Write file without BOM (PS5.1 Encoding UTF8 adds BOM — this doesn't)
+function Write-NoBom {
+    param([string]$Path, [string]$Content)
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
 
 # ask_optional — empty input is fine
 function ask_optional {
     param([string]$Prompt)
-    Write-Host "  [?] ${Prompt} (optional, Enter to skip): " -ForegroundColor Cyan -NoNewline
-    $r = Read-Host
-    return $r
+    Write-Host "  [?] ${Prompt} " -ForegroundColor Cyan -NoNewline
+    Write-Host "(optional, Enter to skip): " -ForegroundColor DarkGray -NoNewline
+    return Read-Host
 }
 
 # ask_required — loops until non-empty
@@ -37,19 +45,20 @@ function ask_required {
         Write-Host "  [?] ${Prompt}: " -ForegroundColor Cyan -NoNewline
         $r = Read-Host
         if ($r) { return $r }
-        Write-Color "     This field is required. Please enter a value." Red
+        Write-Color "      Required — please enter a value." Red
     }
 }
 
-# ask_choice — loops until input matches one of the valid values
+# ask_choice — loops until input is in $Valid
 function ask_choice {
     param([string]$Prompt, [string[]]$Valid, [string]$Default)
     while ($true) {
-        Write-Host "  [?] ${Prompt} [${Default}]: " -ForegroundColor Cyan -NoNewline
+        Write-Host "  [?] ${Prompt} " -ForegroundColor Cyan -NoNewline
+        Write-Host "[default: ${Default}]: " -ForegroundColor DarkGray -NoNewline
         $r = Read-Host
         if (-not $r) { $r = $Default }
         if ($Valid -contains $r) { return $r }
-        Write-Color "     Invalid choice '$r'. Enter one of: $($Valid -join ', ')" Red
+        Write-Color "      Invalid — enter one of: $($Valid -join ', ')" Red
     }
 }
 
@@ -125,7 +134,7 @@ if (-not $ScriptDir -or -not (Test-Path "$ScriptDir\pyproject.toml" -ErrorAction
         ok "Cloned to $CloneDir"
         $ScriptDir = $CloneDir
     } else {
-        fail "git is required. Install Git for Windows from https://git-scm.com and retry."
+        fail "git is required. Install from https://git-scm.com and retry."
     }
 } else {
     ok "Using source at $ScriptDir"
@@ -135,6 +144,7 @@ $GraphclawDir = "$env:USERPROFILE\.graphclaw"
 $WorkspaceDir = "$GraphclawDir\workspace"
 $ConfigFile   = "$GraphclawDir\config.json"
 $EnvFile      = "$GraphclawDir\.env"
+$VenvDir      = "$GraphclawDir\venv"
 
 New-Item -ItemType Directory -Force -Path "$WorkspaceDir\memory" | Out-Null
 New-Item -ItemType Directory -Force -Path "$WorkspaceDir\sessions" | Out-Null
@@ -142,34 +152,43 @@ New-Item -ItemType Directory -Force -Path "$WorkspaceDir\skills\installed" | Out
 New-Item -ItemType Directory -Force -Path "$GraphclawDir\skills\installed" | Out-Null
 
 # ─────────────────────────────────────────────────────────────────────────────
-# STEP 3 -- Install dependencies
+# STEP 3 -- Create venv & install dependencies
 # ─────────────────────────────────────────────────────────────────────────────
 
 Step "Installing dependencies"
 
+info "Creating virtual environment at $VenvDir"
+& $Python -m venv $VenvDir
+if ($LASTEXITCODE -ne 0) { fail "Failed to create virtual environment." }
+
+# Activate venv — all pip/jac commands now install here
+$VenvPython = "$VenvDir\Scripts\python.exe"
+$VenvPip    = "$VenvDir\Scripts\pip.exe"
+ok "Virtual environment created"
+
 $ErrorActionPreference = "Continue"
 
 info "Upgrading pip..."
-& $Python -m pip install --upgrade pip -q 2>&1 | Out-Null
+& $VenvPython -m pip install --upgrade pip -q 2>&1 | Out-Null
 
 info "Installing jaclang (Jac runtime)..."
-& $Python -m pip install "jaclang>=0.7.0" -q 2>&1 | Out-Null
+& $VenvPip install "jaclang>=0.7.0" -q 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) { $ErrorActionPreference = "Stop"; fail "Failed to install jaclang." }
 
 info "Installing graphclaw..."
-& $Python -m pip install -e $ScriptDir -q 2>&1 | Out-Null
+& $VenvPip install -e $ScriptDir -q 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) { $ErrorActionPreference = "Stop"; fail "Failed to install graphclaw." }
 
 $ErrorActionPreference = "Stop"
 
-$JacCmd = Get-Command jac -ErrorAction SilentlyContinue
-if ($JacCmd) {
-    $JacVer = (& jac --version 2>&1) | Select-Object -First 1
-    ok "jac CLI ready ($JacVer)"
+# Verify jac is in the venv
+$VenvJac = "$VenvDir\Scripts\jac.exe"
+if (Test-Path $VenvJac) {
+    ok "jac CLI ready: $VenvJac"
 } else {
-    warn "jac not found in PATH -- restart your terminal after install"
+    warn "jac not found in venv -- this shouldn't happen"
 }
-ok "graphclaw package installed"
+ok "All dependencies installed in venv"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STEP 4 -- Deployment mode
@@ -179,8 +198,8 @@ Step "Deployment mode"
 
 Write-Color "  How will you run Graphclaw?" DarkGray
 Write-Host ""
-Write-Color "    1)  Single-user   -- personal agent, no auth required" White
-Write-Color "    2)  Multi-user    -- hosted platform, JWT auth, per-user memory" White
+Write-Color "    1)  Single-user   -- personal agent, no auth  (best for most users)" White
+Write-Color "    2)  Multi-user    -- hosted server, JWT auth, per-user memory" White
 Write-Host ""
 
 $ModeChoice = ask_choice "Select mode [1/2]" @("1","2") "1"
@@ -190,10 +209,10 @@ $JwtSecret  = ""
 if ($ModeChoice -eq "2") {
     $MultiUser = "true"
     ok "Multi-user mode selected"
-    $JwtSecret = ask_optional "Secret key for JWT (blank to auto-generate)"
+    $JwtSecret = ask_optional "JWT secret key (blank = auto-generate)"
     if (-not $JwtSecret) {
         $JwtSecret = & $Python -c "import secrets; print(secrets.token_hex(32))"
-        warn "Generated JWT secret (save this!): $JwtSecret"
+        warn "Generated JWT secret -- save this: $JwtSecret"
     }
 } else {
     ok "Single-user mode selected"
@@ -207,11 +226,11 @@ Step "LLM provider & channels"
 
 Write-Color "  Choose your default LLM provider:" DarkGray
 Write-Host ""
-Write-Color "    1)  OpenRouter   -- one key, all models  (recommended)" White
-Write-Color "    2)  Anthropic    -- Claude direct" White
-Write-Color "    3)  OpenAI       -- GPT-4o / GPT-4.1" White
-Write-Color "    4)  Ollama       -- local models, no key needed" White
-Write-Color "    5)  Skip         -- configure manually later" White
+Write-Color "    1)  OpenRouter   -- one key, access to all major models  (recommended)" White
+Write-Color "    2)  Anthropic    -- Claude direct (claude.ai/settings -> API Keys)" White
+Write-Color "    3)  OpenAI       -- GPT-4o (platform.openai.com/api-keys)" White
+Write-Color "    4)  Ollama       -- local models, no API key needed" White
+Write-Color "    5)  Skip         -- configure manually in ~/.graphclaw/config.json" White
 Write-Host ""
 
 $ProviderChoice = ask_choice "Select provider [1-5]" @("1","2","3","4","5") "1"
@@ -221,16 +240,19 @@ $ProviderName   = "OpenRouter"
 
 switch ($ProviderChoice) {
     "1" {
+        hint "Get your key at: openrouter.ai/keys"
         $OpenrouterKey = ask_required "OpenRouter API key"
         ok "OpenRouter configured"
     }
     "2" {
+        hint "Get your key at: console.anthropic.com/settings/keys"
         $AnthropicKey = ask_required "Anthropic API key"
         $DefaultModel = "anthropic/claude-sonnet-4-6"
         $ProviderName = "Anthropic"
         ok "Anthropic configured"
     }
     "3" {
+        hint "Get your key at: platform.openai.com/api-keys"
         $OpenaiKey = ask_required "OpenAI API key"
         $DefaultModel = "openai/gpt-4o"
         $ProviderName = "OpenAI"
@@ -239,29 +261,38 @@ switch ($ProviderChoice) {
     "4" {
         $DefaultModel = "ollama/llama3"
         $ProviderName = "Ollama"
-        ok "Ollama -- ensure ollama is running locally"
+        ok "Ollama -- make sure 'ollama serve' is running"
     }
     "5" {
-        ok "Skipped -- edit ~/.graphclaw/config.json to set your key"
+        ok "Skipped -- edit ~/.graphclaw/config.json to add your key later"
         $ProviderName = "(not set)"
     }
 }
 
 Write-Host ""
-Write-Color "  Messaging channels -- leave blank to skip:" DarkGray
+Write-Color "  Messaging channels (all optional -- skip any by pressing Enter):" DarkGray
 Write-Host ""
-$TgToken     = ask_optional "Telegram bot token"
-$DcToken     = ask_optional "Discord bot token"
-$SlBotToken  = ask_optional "Slack bot token"
-$SlAppToken  = ""
+
+hint "Telegram: open Telegram, message @BotFather, send /newbot"
+$TgToken = ask_optional "Telegram bot token"
+
+hint "Discord: discord.com/developers/applications -> New App -> Bot -> Reset Token"
+$DcToken = ask_optional "Discord bot token"
+
+hint "Slack: api.slack.com/apps -> Create App -> OAuth & Permissions -> Bot Token"
+$SlBotToken = ask_optional "Slack bot token (xoxb-...)"
+$SlAppToken = ""
 if ($SlBotToken) {
-    $SlAppToken = ask_required "Slack app token (required when bot token is set)"
+    hint "Slack app token: api.slack.com/apps -> Your App -> Basic Information -> App-Level Tokens"
+    $SlAppToken = ask_required "Slack app token (xapp-...)"
 }
 
 Write-Host ""
-Write-Color "  DevOps skill API keys -- leave blank to skip:" DarkGray
+Write-Color "  DevOps skill API keys (optional):" DarkGray
 Write-Host ""
-$Base44Key   = ask_optional "Base44 API key"
+hint "Base44: app.base44.com/settings -> API Keys"
+$Base44Key = ask_optional "Base44 API key"
+hint "Loveable: lovable.dev/settings -> API"
 $LoveableKey = ask_optional "Loveable API key"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -296,9 +327,9 @@ $ConfigJson = @"
   },
   "channels": {
     "telegram": { "enabled": $tgEnabled, "bot_token": "$TgToken" },
-    "discord": { "enabled": $dcEnabled, "bot_token": "$DcToken" },
-    "slack": { "enabled": $slEnabled, "bot_token": "$SlBotToken", "app_token": "$SlAppToken" },
-    "email": { "enabled": false },
+    "discord":  { "enabled": $dcEnabled, "bot_token": "$DcToken" },
+    "slack":    { "enabled": $slEnabled, "bot_token": "$SlBotToken", "app_token": "$SlAppToken" },
+    "email":    { "enabled": false },
     "whatsapp": { "enabled": false }
   },
   "auth": { "enabled": $MultiUser, "secret_key": "$JwtSecret" },
@@ -308,46 +339,48 @@ $ConfigJson = @"
   }
 }
 "@
-Set-Content -Path $ConfigFile -Value $ConfigJson -Encoding UTF8
+Write-NoBom $ConfigFile $ConfigJson
 ok "Config written to $ConfigFile"
 
-# .env
+# .env — written without BOM so batch/Python can read it cleanly
 $envLines = @("# Graphclaw environment", "GRAPHCLAW_CONFIG_PATH=$ConfigFile")
 if ($OpenrouterKey) { $envLines += "OPENROUTER_API_KEY=$OpenrouterKey" }
 if ($AnthropicKey)  { $envLines += "ANTHROPIC_API_KEY=$AnthropicKey" }
 if ($OpenaiKey)     { $envLines += "OPENAI_API_KEY=$OpenaiKey" }
 if ($Base44Key)     { $envLines += "BASE44_API_KEY=$Base44Key" }
 if ($LoveableKey)   { $envLines += "LOVEABLE_API_KEY=$LoveableKey" }
-$envLines -join "`n" | Set-Content -Path $EnvFile -Encoding UTF8
+Write-NoBom $EnvFile ($envLines -join "`r`n")
 ok ".env written to $EnvFile"
 
-# run.bat
+# run.bat — activates venv, sets config path, runs jac
 $RunBat = "$GraphclawDir\run.bat"
-@"
-@echo off
-for /f "usebackq tokens=*" %%i in ("$EnvFile") do (
-    echo %%i | findstr /v "^#" >nul && set "%%i"
-)
-jac run "$ScriptDir\graphclaw\main.jac" %*
-"@ | Set-Content -Path $RunBat -Encoding UTF8
+$MainJac = "$ScriptDir\graphclaw\main.jac"
+$RunBatContent = "@echo off`r`ncall `"$VenvDir\Scripts\activate.bat`"`r`nset GRAPHCLAW_CONFIG_PATH=$ConfigFile`r`njac run `"$MainJac`" %*`r`n"
+Write-NoBom $RunBat $RunBatContent
 ok "Startup script: $RunBat"
 
-# PowerShell profile alias
+# run.ps1 — PowerShell equivalent (activates venv, runs jac)
+$RunPs1 = "$GraphclawDir\run.ps1"
+$RunPs1Content = "& `"$VenvDir\Scripts\Activate.ps1`"`r`n`$env:GRAPHCLAW_CONFIG_PATH = `"$ConfigFile`"`r`njac run `"$MainJac`" @args`r`n"
+Write-NoBom $RunPs1 $RunPs1Content
+ok "PowerShell startup: $RunPs1"
+
+# PowerShell profile function
 $ProfileDir = Split-Path $PROFILE -Parent
 if (-not (Test-Path $ProfileDir)) { New-Item -ItemType Directory -Force -Path $ProfileDir | Out-Null }
 
-$AliasLine = "function graphclaw { & '$RunBat' @args }"
+$AliasLine = "function graphclaw { & '$RunPs1' @args }"
 if (Test-Path $PROFILE) {
     $existing = Get-Content $PROFILE -Raw -ErrorAction SilentlyContinue
     if ($existing -and $existing -match "function graphclaw") {
         ok "'graphclaw' already in PowerShell profile"
     } else {
         Add-Content -Path $PROFILE -Value "`n$AliasLine"
-        ok "Added 'graphclaw' function to PowerShell profile"
+        ok "Added 'graphclaw' to PowerShell profile"
     }
 } else {
-    Set-Content -Path $PROFILE -Value $AliasLine -Encoding UTF8
-    ok "Created PowerShell profile with 'graphclaw' function"
+    Write-NoBom $PROFILE $AliasLine
+    ok "Created PowerShell profile with 'graphclaw'"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -369,16 +402,19 @@ Write-Host "  Mode:       $modeLabel"
 Write-Host "  Provider:   $ProviderName"
 Write-Host "  Model:      $DefaultModel"
 Write-Host "  Config:     $ConfigFile"
-Write-Host "  Workspace:  $WorkspaceDir"
+Write-Host "  Venv:       $VenvDir"
 Write-Host ""
 
 Write-Color "  Next steps" White
 Write-Color ("  " + ("-" * 42)) DarkGray
-Write-Color "  Reload your PowerShell profile:" White
-Write-Color '      . $PROFILE' Cyan
+Write-Color "  1. Reload your PowerShell profile (required once):" Yellow
+Write-Color "         . `$PROFILE" Cyan
 Write-Host ""
-Write-Color "  Start in CLI mode:" White
-Write-Color "      graphclaw" Cyan
+Write-Color "  2. Run graphclaw:" White
+Write-Color "         graphclaw" Cyan
+Write-Host ""
+Write-Color "     Or run directly without reloading:" DarkGray
+Write-Color "         $RunBat" White
 Write-Host ""
 if ($MultiUser -eq "true") {
     Write-Color "  Start as HTTP server:" White
@@ -386,5 +422,5 @@ if ($MultiUser -eq "true") {
     Write-Host ""
 }
 Write-Color "  Edit config anytime:" White
-Write-Color "      notepad ~/.graphclaw/config.json" Cyan
+Write-Color "      notepad $ConfigFile" Cyan
 Write-Host ""
