@@ -4,6 +4,7 @@ import json
 from typing import Any
 from graphclaw.agents.base import BaseAgent
 from graphclaw.tools.filesystem import ReadFileTool, WriteFileTool, ListDirTool
+from graphclaw.tools.platform_builders import builder_platform_tools
 from graphclaw.tools.shell import ShellTool
 from graphclaw.tools.web import WebSearchTool, WebFetchTool
 from graphclaw.skills.loader import (
@@ -81,7 +82,8 @@ class DevOpsAgent(BaseAgent):
         "Primary skills are OpenClaw-style SKILL.md bundles that you should read and follow before "
         "inventing a custom workflow. Legacy native Python skills remain fallback-only. "
         "If no installed skill is strong enough, use request_skill_install so the user can approve the install; "
-        "do not rely on raw search_clawhub results alone for that approval flow.\n"
+        "do not rely on raw search_clawhub results alone for that approval flow. "
+        "Use Loveable when the user wants a fast website/app concept link, and use Base44 when they want a scaffolded or deployed managed app.\n"
         "Always verify before making destructive changes."
     )
 
@@ -97,6 +99,7 @@ class DevOpsAgent(BaseAgent):
         self.tools = [
             ReadFileTool(ws), WriteFileTool(ws), ListDirTool(ws),
             ShellTool(ws), WebSearchTool(), WebFetchTool(),
+            *builder_platform_tools(channel=self.channel, chat_id=self.chat_id),
             _SearchClawHubTool(), _InstallSkillTool(), _UpdateSkillTool(), _UpdateAllSkillsTool(),
         ]
         attach_skill_runtime(self)

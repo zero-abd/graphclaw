@@ -444,12 +444,12 @@ switch ($ChannelChoice) {
 }
 
 Write-Host ""
-Write-Color "  DevOps skill API keys (optional):" DarkGray
+Write-Color "  Dev tool integrations:" DarkGray
 Write-Host ""
-hint "Base44: app.base44.com/settings -> API Keys"
-$Base44Key = ask_optional "Base44 API key"
-hint "Loveable: lovable.dev/settings -> API"
-$LoveableKey = ask_optional "Loveable API key"
+hint "Base44 uses the official Base44 CLI flow. On first use, Graphclaw can call `base44` (or `npx --yes base44@latest`) and may prompt you to log in."
+hint "Loveable uses official Build with URL links, so no API key is required for the fast website-generation flow."
+$Base44Key = ""
+$LoveableKey = ""
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STEP 6 -- Write config & shell integration
@@ -573,10 +573,8 @@ $envMap["GRAPHCLAW_HOME"] = $GraphclawDir
 if ($OpenrouterKey) { $envMap["OPENROUTER_API_KEY"] = $OpenrouterKey }
 if ($AnthropicKey)  { $envMap["ANTHROPIC_API_KEY"] = $AnthropicKey }
 if ($OpenaiKey)     { $envMap["OPENAI_API_KEY"] = $OpenaiKey }
-if ($Base44Key)     { $envMap["BASE44_API_KEY"] = $Base44Key }
-if ($LoveableKey)   { $envMap["LOVEABLE_API_KEY"] = $LoveableKey }
 $envLines = @("# Graphclaw environment")
-foreach ($key in @("GRAPHCLAW_CONFIG_PATH","GRAPHCLAW_HOME","OPENROUTER_API_KEY","ANTHROPIC_API_KEY","OPENAI_API_KEY","BASE44_API_KEY","LOVEABLE_API_KEY")) {
+foreach ($key in @("GRAPHCLAW_CONFIG_PATH","GRAPHCLAW_HOME","OPENROUTER_API_KEY","ANTHROPIC_API_KEY","OPENAI_API_KEY")) {
     if ($envMap.ContainsKey($key) -and $envMap[$key]) {
         $envLines += "${key}=$($envMap[$key])"
     }
