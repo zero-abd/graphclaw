@@ -126,6 +126,20 @@ def list_skills() -> List[Dict[str, Any]]:
     return skills
 
 
+def build_skills_summary(limit: int = 24) -> str:
+    skills = list_skills()
+    if not skills:
+        return "No workspace/shared/bundled skills are currently installed."
+    lines = []
+    for skill in skills[:limit]:
+        lines.append(
+            f"- {skill.get('slug', 'skill')} [{skill.get('type', 'skill')}] from {skill.get('source', 'local')}: {skill.get('description', '')}"
+        )
+    if len(skills) > limit:
+        lines.append(f"- ... and {len(skills) - limit} more")
+    return "\n".join(lines)
+
+
 def list_native_skill_functions(slug: str) -> List[str]:
     """Return callable public functions exposed by a native skill."""
     for base in _skill_search_paths():
@@ -224,6 +238,44 @@ async def install_skill(source: str) -> str:
             return "Error: aiohttp not installed"
         except Exception as e:
             return f"Error installing skill: {e}"
+
+
+async def update_skill(slug: str) -> str:
+    lock = _read_lock().get("skills", {})
+    entry = lock.get(slug)
+    if not entry:
+        return f"Skill '{slug}' is not tracked in .clawhub/lock.json"
+
+    source = str(entry.get("source", "")).strip()
+    target = _workspace_skills_dir() / slug
+    if not target.exists():
+        return f"Skill '{slug}' is missing from the workspace skills directory"
+
+    if source == "clawhub":
+        if target.exists():
+            import shutil
+            shutil.rmtree(target)
+        return await install_skill(slug)
+
+    if source.startswith("http"):
+        import subprocess
+        result = subprocess.run(["git", "-C", str(target), "pull", "--ff-only"], capture_output=True, text=True)
+        if result.returncode != 0:
+            return f"Failed to update '{slug}': {result.stderr.strip()}"
+        _update_lock(slug, source=source, version="git", skill_type="skill")
+        return f"Updated '{slug}' from {source}. Start a new session to load it."
+
+    return f"Skill '{slug}' has an unsupported source '{source}'"
+
+
+async def update_all_skills() -> str:
+    lock = _read_lock().get("skills", {})
+    if not lock:
+        return "No ClawHub-managed skills are tracked in .clawhub/lock.json"
+    results = []
+    for slug in sorted(lock):
+        results.append(await update_skill(slug))
+    return "\n".join(results)
 
 
 def invoke_skill(slug: str, function_name: str = "", **kwargs: Any) -> str:
