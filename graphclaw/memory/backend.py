@@ -197,6 +197,36 @@ def _ensure_core_memory_graph(workspace: Path) -> None:
         topics=["assistant", "skills", "shared"],
         relationship="has_skill_group",
     )
+    mcp_root_id = upsert_system_memory(
+        "assistant_mcp_root",
+        "MCP root",
+        topics=["assistant", "mcp"],
+        relationship="has_mcp",
+    )
+    mcp_servers_id = upsert_system_memory(
+        "assistant_mcp_servers",
+        "Configured MCP servers",
+        topics=["assistant", "mcp", "servers"],
+        relationship="has_mcp_group",
+    )
+    mcp_tools_id = upsert_system_memory(
+        "assistant_mcp_tools",
+        "MCP tools",
+        topics=["assistant", "mcp", "tools"],
+        relationship="has_mcp_group",
+    )
+    mcp_resources_id = upsert_system_memory(
+        "assistant_mcp_resources",
+        "MCP resources",
+        topics=["assistant", "mcp", "resources"],
+        relationship="has_mcp_group",
+    )
+    mcp_prompts_id = upsert_system_memory(
+        "assistant_mcp_prompts",
+        "MCP prompts",
+        topics=["assistant", "mcp", "prompts"],
+        relationship="has_mcp_group",
+    )
 
     root_node = next(
         (item for item in memories if str(item.get("system_key", "")) == "assistant_root"),
@@ -211,6 +241,7 @@ def _ensure_core_memory_graph(workspace: Path) -> None:
             {"to": dream_id, "relationship": "runs_dream_cycle", "weight": 1.0},
             {"to": conversation_cadence_id, "relationship": "speaks_with_cadence", "weight": 1.0},
             {"to": skills_root_id, "relationship": "has_skills", "weight": 1.0},
+            {"to": mcp_root_id, "relationship": "has_mcp", "weight": 1.0},
         ]
         for relation in desired_relationships:
             if relation not in relationships:
@@ -266,6 +297,80 @@ def _ensure_core_memory_graph(workspace: Path) -> None:
                     relationships.append(relation)
                     group_node["updated_at"] = now
                     memories_changed = True
+    except Exception:
+        pass
+
+    mcp_root_node = next(
+        (item for item in memories if str(item.get("system_key", "")) == "assistant_mcp_root"),
+        None,
+    )
+    if mcp_root_node is not None:
+        relationships = _ensure_memory_relationships(mcp_root_node)
+        desired_relationships = [
+            {"to": mcp_servers_id, "relationship": "has_mcp_group", "weight": 1.0},
+            {"to": mcp_tools_id, "relationship": "has_mcp_group", "weight": 1.0},
+            {"to": mcp_resources_id, "relationship": "has_mcp_group", "weight": 1.0},
+            {"to": mcp_prompts_id, "relationship": "has_mcp_group", "weight": 1.0},
+        ]
+        for relation in desired_relationships:
+            if relation not in relationships:
+                relationships.append(relation)
+                mcp_root_node["updated_at"] = now
+                memories_changed = True
+
+    try:
+        from graphclaw.mcp.runtime import _read_cache as read_mcp_cache, configured_servers
+
+        def slugify(raw: str) -> str:
+            cleaned = re.sub(r"[^a-z0-9]+", "_", raw.lower()).strip("_")
+            return cleaned or "item"
+
+        mcp_cache = read_mcp_cache().get("servers", {})
+        configured = configured_servers()
+        for server_name in sorted(set(configured.keys()) | set(mcp_cache.keys())):
+            server_slug = slugify(server_name)
+            server_id = upsert_system_memory(
+                f"assistant_mcp_server_{server_slug}",
+                f"MCP server: {server_name}",
+                topics=["assistant", "mcp", "server"],
+                relationship="has_mcp_server",
+            )
+            group_node = next((item for item in memories if str(item.get("id")) == mcp_servers_id), None)
+            if group_node is not None:
+                relationships = _ensure_memory_relationships(group_node)
+                relation = {"to": server_id, "relationship": "has_mcp_server", "weight": 1.0}
+                if relation not in relationships:
+                    relationships.append(relation)
+                    group_node["updated_at"] = now
+                    memories_changed = True
+
+            server_cache = mcp_cache.get(server_name, {})
+            for bucket_name, group_id, item_key, relation_name in [
+                ("tools", mcp_tools_id, "name", "has_mcp_tool"),
+                ("resources", mcp_resources_id, "uri", "has_mcp_resource"),
+                ("prompts", mcp_prompts_id, "name", "has_mcp_prompt"),
+            ]:
+                for entry in server_cache.get(bucket_name, [])[:24]:
+                    raw_name = str(entry.get(item_key, "") or entry.get("name", "")).strip()
+                    if not raw_name:
+                        continue
+                    item_slug = slugify(f"{server_name}_{bucket_name}_{raw_name}")
+                    item_id = upsert_system_memory(
+                        f"assistant_mcp_{bucket_name[:-1]}_{item_slug}",
+                        f"{bucket_name[:-1].capitalize()}: {raw_name}",
+                        topics=["assistant", "mcp", bucket_name[:-1]],
+                        relationship=relation_name,
+                    )
+                    for parent_id in (group_id, server_id):
+                        parent_node = next((item for item in memories if str(item.get("id")) == parent_id), None)
+                        if parent_node is None:
+                            continue
+                        relationships = _ensure_memory_relationships(parent_node)
+                        relation = {"to": item_id, "relationship": relation_name, "weight": 1.0}
+                        if relation not in relationships:
+                            relationships.append(relation)
+                            parent_node["updated_at"] = now
+                            memories_changed = True
     except Exception:
         pass
 
