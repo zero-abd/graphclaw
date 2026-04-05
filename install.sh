@@ -78,21 +78,56 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 step "Checking Python"
 
-PYTHON=""
-for cmd in python3.13 python3.12 python3 python; do
-    if command -v "$cmd" &>/dev/null; then
-        _maj=$("$cmd" -c "import sys; print(sys.version_info.major)" 2>/dev/null || echo 0)
-        _min=$("$cmd" -c "import sys; print(sys.version_info.minor)" 2>/dev/null || echo 0)
-        if [ "$_maj" -ge 3 ] && [ "$_min" -ge 12 ]; then
-            PYTHON="$cmd"
-            break
+find_python() {
+    for cmd in python3.13 python3.12 python3 python; do
+        if command -v "$cmd" &>/dev/null; then
+            _maj=$("$cmd" -c "import sys; print(sys.version_info.major)" 2>/dev/null || echo 0)
+            _min=$("$cmd" -c "import sys; print(sys.version_info.minor)" 2>/dev/null || echo 0)
+            # Accept 3.12-3.13 only; 3.14+ has venv issues and jaclang doesn't support it yet
+            if [ "$_maj" -eq 3 ] && [ "$_min" -ge 12 ] && [ "$_min" -le 13 ]; then
+                echo "$cmd"; return 0
+            elif [ "$_maj" -eq 3 ] && [ "$_min" -ge 14 ]; then
+                warn "Python $_maj.$_min detected but 3.14+ is not yet supported. Will install 3.13."
+            fi
         fi
-    fi
-done
+    done
+    return 1
+}
+
+PYTHON=$(find_python)
 
 if [ -z "$PYTHON" ]; then
-    fail "Python 3.12+ not found. Install from ${W}https://python.org/downloads${NC}"
+    info "Python 3.12-3.13 not found — installing Python 3.13..."
+    if [ "$PLATFORM" = "mac" ]; then
+        if command -v brew &>/dev/null; then
+            brew install python@3.13 -q
+            PYTHON=$(find_python)
+        else
+            warn "Homebrew not found. Install from https://brew.sh then re-run."
+            fail "Python 3.13 required. Install from https://python.org/downloads/release/python-3130/"
+        fi
+    elif [ "$PLATFORM" = "linux" ]; then
+        if command -v apt-get &>/dev/null; then
+            info "Adding deadsnakes PPA and installing python3.13..."
+            sudo apt-get update -qq
+            sudo apt-get install -y software-properties-common -qq
+            sudo add-apt-repository -y ppa:deadsnakes/ppa -q
+            sudo apt-get update -qq
+            sudo apt-get install -y python3.13 python3.13-venv python3.13-dev -qq
+        elif command -v dnf &>/dev/null; then
+            sudo dnf install -y python3.13
+        elif command -v pacman &>/dev/null; then
+            sudo pacman -Sy --noconfirm python
+        fi
+        PYTHON=$(find_python)
+    fi
+
+    if [ -z "$PYTHON" ]; then
+        fail "Could not install Python 3.13 automatically. Install from: https://python.org/downloads/release/python-3130/"
+    fi
+    ok "Python 3.13 installed"
 fi
+
 ok "Using ${W}$($PYTHON --version 2>&1)${NC}"
 
 # ─────────────────────────────────────────────────────────────────────────────

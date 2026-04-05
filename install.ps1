@@ -91,26 +91,48 @@ function Step {
 
 Step "Checking Python"
 
-$Python = $null
-foreach ($cmd in @("python3.13","python3.12","python3","python","py")) {
-    $found = Get-Command $cmd -ErrorAction SilentlyContinue
-    if ($found) {
-        try {
-            $ver = & $cmd -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
-            if ($ver -match '^\d+\.\d+$') {
-                $parts = $ver.Split(".")
-                if ([int]$parts[0] -ge 3 -and [int]$parts[1] -ge 12) {
-                    $Python = $cmd
-                    break
+function Find-Python {
+    foreach ($cmd in @("python3.13","python3.12","python3","python","py")) {
+        $found = Get-Command $cmd -ErrorAction SilentlyContinue
+        if ($found) {
+            try {
+                $ver = & $cmd -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
+                if ($ver -match '^\d+\.\d+$') {
+                    $parts = $ver.Split(".")
+                    $maj = [int]$parts[0]; $min = [int]$parts[1]
+                    # Accept 3.12 and 3.13 only -- 3.14+ has venv bugs and jaclang doesn't support it yet
+                    if ($maj -eq 3 -and $min -ge 12 -and $min -le 13) { return $cmd }
+                    if ($maj -eq 3 -and $min -ge 14) {
+                        warn "Python $ver detected but 3.14+ is not yet supported (venv bugs, jaclang incompatible). Will install 3.13."
+                    }
                 }
-            }
-        } catch { }
+            } catch { }
+        }
     }
+    return $null
 }
 
+$Python = Find-Python
+
 if (-not $Python) {
-    Write-Host ""
-    fail "Python 3.12+ not found. Download from https://python.org/downloads"
+    info "Python 3.12-3.13 not found -- installing Python 3.13 via winget..."
+    $winget = Get-Command winget -ErrorAction SilentlyContinue
+    if ($winget) {
+        winget install --id Python.Python.3.13 --source winget --silent --accept-package-agreements --accept-source-agreements
+        if ($LASTEXITCODE -eq 0) {
+            # Refresh PATH so the new python is visible
+            $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH","User")
+            $Python = Find-Python
+        }
+    }
+    if (-not $Python) {
+        Write-Host ""
+        Write-Color "  Python 3.13 could not be installed automatically." Red
+        Write-Color "  Please install it manually from: https://python.org/downloads/release/python-3130/" Yellow
+        Write-Color "  Make sure to check 'Add python.exe to PATH' during installation." Yellow
+        exit 1
+    }
+    ok "Python 3.13 installed via winget"
 }
 
 $pyVer = & $Python --version 2>&1
