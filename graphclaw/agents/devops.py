@@ -7,10 +7,13 @@ from graphclaw.tools.filesystem import ReadFileTool, WriteFileTool, ListDirTool
 from graphclaw.tools.shell import ShellTool
 from graphclaw.tools.web import WebSearchTool, WebFetchTool
 from graphclaw.skills.loader import (
+    build_skills_summary,
     install_skill,
     invoke_skill_async,
     list_skills,
     search_clawhub,
+    update_all_skills,
+    update_skill,
 )
 from graphclaw.config.loader import load_config
 
@@ -59,8 +62,7 @@ class _ListSkillsTool:
 class _InvokeSkillTool:
     name = "invoke_skill"
     description = (
-        "Invoke an installed native skill function, or retrieve instructions for a "
-        "ClawHub SKILL.md skill."
+        "Read an installed OpenClaw/ClawHub SKILL.md skill for the current task, or invoke a legacy native skill when explicitly requested."
     )
     parameters = {
         "type": "object",
@@ -96,6 +98,32 @@ class _InvokeSkillTool:
         )
 
 
+
+
+class _UpdateSkillTool:
+    name = "update_skill"
+    description = "Update one installed OpenClaw/ClawHub skill tracked in .clawhub/lock.json."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "slug": {"type": "string", "description": "Installed skill slug"},
+        },
+        "required": ["slug"],
+    }
+
+    async def execute(self, **kwargs: Any) -> str:
+        return await update_skill(kwargs["slug"])
+
+
+class _UpdateAllSkillsTool:
+    name = "update_all_skills"
+    description = "Update all OpenClaw/ClawHub skills tracked in .clawhub/lock.json."
+    parameters = {"type": "object", "properties": {}}
+
+    async def execute(self, **kwargs: Any) -> str:
+        return await update_all_skills()
+
+
 class DevOpsAgent(BaseAgent):
     name = "devops"
     system_prompt = (
@@ -111,8 +139,14 @@ class DevOpsAgent(BaseAgent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         ws = load_config().workspace
+        self.system_prompt = (
+            self.system_prompt
+            + "\n\nInstalled workspace/shared skills (OpenClaw-style):\n"
+            + build_skills_summary()
+            + "\n\nPrefer those SKILL.md skills before inventing custom workflows. If a skill is newly installed or updated, tell the user to start a new session so the skill snapshot refreshes."
+        )
         self.tools = [
             ReadFileTool(ws), WriteFileTool(ws), ListDirTool(ws),
             ShellTool(ws), WebSearchTool(), WebFetchTool(),
-            _SearchClawHubTool(), _InstallSkillTool(), _ListSkillsTool(), _InvokeSkillTool(),
+            _SearchClawHubTool(), _InstallSkillTool(), _UpdateSkillTool(), _UpdateAllSkillsTool(), _ListSkillsTool(), _InvokeSkillTool(),
         ]
