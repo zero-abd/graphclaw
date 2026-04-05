@@ -1,0 +1,19 @@
+{
+  "name": "base44",
+  "description": "Deploy, manage, and monitor applications on Base44 AI app platform",
+  "version": "0.1.0",
+  "author": "graphclaw",
+  "tools": [
+    "list_apps",
+    "get_app",
+    "deploy_app",
+    "get_build_logs",
+    "get_app_status",
+    "update_env_vars",
+    "get_env_vars",
+    "restart_app",
+    "rollback_app"
+  ],
+  "requirements": [],
+  "source_url": "https://github.com/graphclaw/skills-registry/tree/main/base44"
+}

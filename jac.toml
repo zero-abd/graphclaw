@@ -1,0 +1,35 @@
+[project]
+name = "graphclaw"
+version = "0.1.0"
+description = "Graph-native multi-agent AI platform powered by Jac OSP"
+authors = []
+
+[plugins.byllm.model]
+default_model = "openrouter/anthropic/claude-sonnet-4-6"
+api_key = ""
+base_url = "https://openrouter.ai/api/v1"
+verbose = false
+
+[plugins.byllm.call_params]
+temperature = 0.7
+max_tokens = 8192
+
+[plugins.byllm.litellm]
+local_cost_map = true
+drop_params = true
+debug = false
+
+[plugins.byllm.fallback]
+strategy = "fallback"
+num_retries = 2
+timeout = 120.0
+
+[plugins.byllm]
+system_prompt = "You are Graphclaw, a graph-native AI agent. You reason carefully, use tools efficiently, and always ground your responses in the memory graph."
+
+[server]
+host = "0.0.0.0"
+port = 8000
+
+[auth]
+enabled = false   # set to true for multi-user mode (toggled by install.sh)
