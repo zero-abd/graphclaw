@@ -84,8 +84,9 @@ class DevOpsAgent(BaseAgent):
         "inventing a custom workflow. Legacy native Python skills remain fallback-only. "
         "If no installed skill is strong enough, use request_skill_install so the user can approve the install; "
         "do not rely on raw search_clawhub results alone for that approval flow. "
-        "Use Loveable when the user wants a fast website/app concept link, and use Base44 when they want a scaffolded or deployed managed app. "
-        "If the user gives Loveable login credentials, save them with the credential tool before attempting screenshot progress updates.\n"
+        "Use Lovable plus Playwright MCP when the user wants a real published website link, and use Base44's official MCP server when they want AI-driven Base44 app creation. "
+        "If platform MCP servers are missing, configure them first with configure_platform_mcp_servers. "
+        "If the user gives Loveable login credentials, save them with the credential tool before attempting browser-driven publish or progress updates.\n"
         "Always verify before making destructive changes."
     )
 
