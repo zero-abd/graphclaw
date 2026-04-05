@@ -434,7 +434,7 @@ $env:GRAPHCLAW_DC_TOKEN = $DcToken
 $env:GRAPHCLAW_SL_BOT_TOKEN = $SlBotToken
 $env:GRAPHCLAW_SL_APP_TOKEN = $SlAppToken
 
-$ConfigMerge = @"
+$ConfigMerge = @'
 import json
 import os
 from pathlib import Path
@@ -507,8 +507,11 @@ skills["installed_path"] = os.environ["GRAPHCLAW_INSTALLED_SKILLS"]
 
 config_path.parent.mkdir(parents=True, exist_ok=True)
 config_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-"@
-& $VenvPython -c $ConfigMerge
+'@
+$ConfigMergePath = Join-Path $env:TEMP "graphclaw-config-merge.py"
+Write-NoBom $ConfigMergePath $ConfigMerge
+& $VenvPython $ConfigMergePath
+Remove-Item $ConfigMergePath -ErrorAction SilentlyContinue
 if ($LASTEXITCODE -ne 0) { fail "Failed to write merged config." }
 ok "Config written to $ConfigFile"
 
