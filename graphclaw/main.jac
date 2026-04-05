@@ -118,24 +118,32 @@ with entry {
     print(f"[graphclaw] starting -- workspace: {cfg.workspace}")
 
     channels_started = []
+    channel_failures = []
+
+    async def _try_start_channel(name, starter):
+        try:
+            started = await starter()
+        except Exception as exc:
+            print(f"[{name}] startup error: {exc}")
+            channel_failures.append(name)
+            return
+        if started:
+            channels_started.append(name)
+        else:
+            channel_failures.append(name)
 
     async def _start_channels():
         ch = cfg.channels
         if ch.get("telegram", {}).get("enabled"):
-            await start_telegram_channel()
-            channels_started.append("telegram")
+            await _try_start_channel("telegram", start_telegram_channel)
         if ch.get("discord", {}).get("enabled"):
-            await start_discord_channel()
-            channels_started.append("discord")
+            await _try_start_channel("discord", start_discord_channel)
         if ch.get("slack", {}).get("enabled"):
-            await start_slack_channel()
-            channels_started.append("slack")
+            await _try_start_channel("slack", start_slack_channel)
         if ch.get("email", {}).get("enabled"):
-            await start_email_channel()
-            channels_started.append("email")
+            await _try_start_channel("email", start_email_channel)
         if ch.get("whatsapp", {}).get("enabled"):
-            await start_whatsapp_channel()
-            channels_started.append("whatsapp")
+            await _try_start_channel("whatsapp", start_whatsapp_channel)
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -143,8 +151,14 @@ with entry {
 
     if channels_started:
         print("[graphclaw] channels: " + ", ".join(channels_started))
+    elif channel_failures:
+        print("[graphclaw] enabled channels failed to start: " + ", ".join(channel_failures))
+        print("[graphclaw] falling back to local CLI mode")
     else:
         print("[graphclaw] no channels enabled -- running in CLI mode")
+
+    if channel_failures:
+        print("[graphclaw] fix the channel setup above, or disable that channel in config.json to suppress the warning")
         key_prompt = maybe_prompt_for_provider_key()
         if key_prompt.action == "saved":
             print(f"[graphclaw] {key_prompt.message}")

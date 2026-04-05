@@ -1,16 +1,17 @@
 """WhatsApp channel integration via Baileys bridge."""
 from __future__ import annotations
 import asyncio
+import sys
 from graphclaw.channels.bus import bus, InboundMessage, OutboundMessage
 from graphclaw.config.loader import load_config
 
 
-async def start_whatsapp_channel() -> None:
+async def start_whatsapp_channel() -> bool:
     """Start the WhatsApp channel in the background."""
     cfg = load_config()
     ch = cfg.channels.get("whatsapp", {})
     if not ch.get("enabled"):
-        return
+        return False
 
     bridge_url = ch.get("bridge_url", "http://localhost:3001")
     api_token = ch.get("api_token", "")
@@ -18,14 +19,14 @@ async def start_whatsapp_channel() -> None:
 
     if not bridge_url:
         print("[whatsapp] no bridge_url configured, skipping")
-        return
+        return False
 
     async def _poll_loop() -> None:
         try:
             import aiohttp
         except ImportError:
-            print("[whatsapp] aiohttp not installed — pip install aiohttp")
-            return
+            print(f"[whatsapp] aiohttp not installed — install it with: {sys.executable} -m pip install 'aiohttp>=3.10.0'")
+            return False
 
         headers = {}
         if api_token:
@@ -55,7 +56,7 @@ async def start_whatsapp_channel() -> None:
         try:
             import aiohttp
         except ImportError:
-            return
+            return False
 
         headers = {"Content-Type": "application/json"}
         if api_token:
@@ -78,3 +79,4 @@ async def start_whatsapp_channel() -> None:
     asyncio.ensure_future(_poll_loop())
     asyncio.ensure_future(_send_loop())
     print("[whatsapp] started")
+    return True
