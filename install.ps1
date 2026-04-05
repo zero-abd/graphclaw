@@ -91,40 +91,51 @@ function Step {
 
 Step "Checking Python"
 
-# Known install locations winget uses for Python 3.13
-$Python313Paths = @(
-    "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe",
-    "$env:ProgramFiles\Python313\python.exe",
-    "$env:ProgramFiles\Python\Python313\python.exe"
-)
-
-function Test-PythonVersion {
+function Test-PythonExe {
     param([string]$Exe)
+    if (-not (Test-Path $Exe -ErrorAction SilentlyContinue)) { return $false }
     try {
         $ver = & $Exe -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
         if ($ver -match '^\d+\.\d+$') {
             $parts = $ver.Split(".")
-            $maj = [int]$parts[0]; $min = [int]$parts[1]
-            if ($maj -eq 3 -and $min -ge 12 -and $min -le 13) { return $true }
+            return ([int]$parts[0] -eq 3 -and [int]$parts[1] -ge 12 -and [int]$parts[1] -le 13)
         }
     } catch { }
     return $false
 }
 
 function Find-Python {
-    # First check known 3.13 install paths directly (bypasses PATH ordering)
-    foreach ($p in $Python313Paths) {
-        if ((Test-Path $p) -and (Test-PythonVersion $p)) { return $p }
+    # 1. Windows Python Launcher -- most reliable, works regardless of PATH
+    $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+    if ($pyLauncher) {
+        foreach ($tag in @("3.13","3.12")) {
+            try {
+                $exe = & py -$tag -c "import sys; print(sys.executable)" 2>$null
+                if ($exe -and (Test-PythonExe $exe)) { return $exe }
+            } catch { }
+        }
     }
-    # Then check PATH, skipping 3.14+
-    foreach ($cmd in @("python3.13","python3.12","python3","python","py")) {
+
+    # 2. Known install paths (user + system, winget and manual installs)
+    $candidates = @(
+        "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe",
+        "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe",
+        "$env:ProgramFiles\Python313\python.exe",
+        "$env:ProgramFiles\Python312\python.exe",
+        "C:\Python313\python.exe",
+        "C:\Python312\python.exe"
+    )
+    foreach ($p in $candidates) {
+        if (Test-PythonExe $p) { return $p }
+    }
+
+    # 3. PATH scan -- skip 3.14+
+    foreach ($cmd in @("python3.13","python3.12","python3","python")) {
         $found = Get-Command $cmd -ErrorAction SilentlyContinue
         if ($found) {
-            $exe = $found.Source
-            if (Test-PythonVersion $exe) { return $exe }
-            # Detect unsupported version for warning
+            if (Test-PythonExe $found.Source) { return $found.Source }
             try {
-                $ver = & $exe -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
+                $ver = & $found.Source -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
                 if ($ver -match '^3\.1[4-9]') {
                     warn "Python $ver found but 3.14+ is not supported yet (jaclang incompatible). Skipping."
                 }
@@ -140,19 +151,19 @@ if (-not $Python) {
     info "Python 3.12-3.13 not found -- installing Python 3.13 via winget..."
     $winget = Get-Command winget -ErrorAction SilentlyContinue
     if ($winget) {
-        winget install --id Python.Python.3.13 --source winget --silent --accept-package-agreements --accept-source-agreements
-        if ($LASTEXITCODE -eq 0) {
-            ok "Python 3.13 installed"
-            # Refresh PATH then check known paths
-            $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH","User")
-            $Python = Find-Python
-        }
+        # winget exits 0 for both fresh install and "already installed" -- both are fine
+        winget install --id Python.Python.3.13 --source winget --silent --accept-package-agreements --accept-source-agreements 2>&1 | Out-Null
+        # Refresh PATH and retry
+        $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH","User")
+        $Python = Find-Python
     }
     if (-not $Python) {
         Write-Host ""
-        Write-Color "  Python 3.13 was installed but this terminal cannot find it yet." Yellow
-        Write-Color "  Please close this window and run the installer again in a new terminal:" White
+        Write-Color "  Python 3.13 is installed but needs a new terminal session to be found." Yellow
+        Write-Host ""
+        Write-Color "  Please open a NEW PowerShell window and run:" White
         Write-Color "      irm https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.ps1 | iex" Cyan
+        Write-Host ""
         exit 0
     }
 }
