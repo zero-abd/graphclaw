@@ -1,11 +1,12 @@
 """Slack channel integration using slack-bolt."""
 from __future__ import annotations
 import asyncio
+import sys
 from graphclaw.channels.bus import bus, InboundMessage, OutboundMessage
 from graphclaw.config.loader import load_config
 
 
-async def start_slack_channel() -> None:
+async def start_slack_channel() -> bool:
     """Start the Slack bot in the background."""
     cfg = load_config()
     ch = cfg.channels.get("slack", {})
@@ -13,24 +14,24 @@ async def start_slack_channel() -> None:
     app_token = ch.get("app_token", "")
     if not bot_token or not app_token:
         print("[slack] bot_token and app_token required, skipping")
-        return
+        return False
 
     try:
         from slack_bolt.async_app import AsyncApp
         from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
     except ImportError:
-        print("[slack] slack-bolt not installed — pip install slack-bolt")
-        return
+        print(f"[slack] slack-bolt not installed — install it with: {sys.executable} -m pip install 'slack-bolt>=1.21.0'")
+        return False
 
     app = AsyncApp(token=bot_token)
 
     @app.event("message")
     async def handle_message(event, say):
         if event.get("subtype"):  # ignore bot messages, edits, etc.
-            return
+            return False
         text = event.get("text", "")
         if not text:
-            return
+            return False
 
         user_id = event.get("user", "unknown")
         chat_id = event.get("channel", "unknown")
@@ -66,3 +67,4 @@ async def start_slack_channel() -> None:
     handler = AsyncSocketModeHandler(app, app_token)
     asyncio.ensure_future(handler.start_async())
     print("[slack] started socket mode")
+    return True

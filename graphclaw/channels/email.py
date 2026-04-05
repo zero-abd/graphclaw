@@ -5,12 +5,12 @@ from graphclaw.channels.bus import bus, InboundMessage, OutboundMessage
 from graphclaw.config.loader import load_config
 
 
-async def start_email_channel() -> None:
+async def start_email_channel() -> bool:
     """Start the email channel in the background."""
     cfg = load_config()
     ch = cfg.channels.get("email", {})
     if not ch.get("enabled"):
-        return
+        return False
 
     imap_host = ch.get("imap_host", "")
     smtp_host = ch.get("smtp_host", "")
@@ -20,7 +20,7 @@ async def start_email_channel() -> None:
 
     if not all([imap_host, smtp_host, username, password]):
         print("[email] incomplete config, skipping")
-        return
+        return False
 
     async def _poll_loop() -> None:
         import imaplib
@@ -84,3 +84,4 @@ async def start_email_channel() -> None:
     asyncio.ensure_future(_poll_loop())
     asyncio.ensure_future(_send_loop())
     print("[email] started")
+    return True

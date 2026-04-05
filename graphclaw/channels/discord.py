@@ -1,24 +1,25 @@
 """Discord channel integration using discord.py."""
 from __future__ import annotations
 import asyncio
+import sys
 from graphclaw.channels.bus import bus, InboundMessage, OutboundMessage
 from graphclaw.config.loader import load_config
 
 
-async def start_discord_channel() -> None:
+async def start_discord_channel() -> bool:
     """Start the Discord bot in the background."""
     cfg = load_config()
     ch = cfg.channels.get("discord", {})
     token = ch.get("bot_token", "")
     if not token:
         print("[discord] no bot_token configured, skipping")
-        return
+        return False
 
     try:
         import discord
     except ImportError:
-        print("[discord] discord.py not installed — pip install discord.py")
-        return
+        print(f"[discord] discord.py not installed — install it with: {sys.executable} -m pip install 'discord.py>=2.4.0'")
+        return False
 
     intents = discord.Intents.default()
     intents.message_content = True
@@ -31,9 +32,9 @@ async def start_discord_channel() -> None:
     @client.event
     async def on_message(message):
         if message.author == client.user:
-            return
+            return False
         if not message.content:
-            return
+            return False
 
         bus.publish_inbound(InboundMessage(
             channel="discord",
@@ -61,3 +62,4 @@ async def start_discord_channel() -> None:
 
     asyncio.ensure_future(client.start(token))
     asyncio.ensure_future(_send_loop())
+    return True
