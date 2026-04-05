@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import sys
 from graphclaw.channels.bus import bus, InboundMessage, OutboundMessage
+from graphclaw.channels.auth import AuthEvent, ChannelAuthManager
 from graphclaw.config.loader import load_config
 
 
@@ -21,6 +22,10 @@ async def start_discord_channel() -> bool:
         print(f"[discord] discord.py not installed — install it with: {sys.executable} -m pip install 'discord.py>=2.4.0'")
         return False
 
+    auth = ChannelAuthManager("discord", ch)
+    for warning in auth.startup_warnings():
+        print(f"[discord] {warning}")
+
     intents = discord.Intents.default()
     intents.message_content = True
     client = discord.Client(intents=intents)
@@ -32,15 +37,57 @@ async def start_discord_channel() -> bool:
     @client.event
     async def on_message(message):
         if message.author == client.user:
-            return False
+            return None
         if not message.content:
-            return False
+            return None
+
+        is_direct = message.guild is None
+        reply_to_bot = bool(
+            message.reference
+            and getattr(message.reference, "resolved", None)
+            and getattr(message.reference.resolved, "author", None) == client.user
+        )
+        is_mentioned = reply_to_bot or client.user.mentioned_in(message)
+        decision = auth.evaluate(
+            AuthEvent(
+                channel="discord",
+                user_id=str(message.author.id),
+                chat_id=str(message.channel.id),
+                text=message.content,
+                is_direct=is_direct,
+                username=str(getattr(message.author, "name", "")),
+                display_name=str(getattr(message.author, "display_name", "") or getattr(message.author, "global_name", "")),
+                is_mentioned=is_mentioned,
+                mention_detection_available=client.user is not None,
+                channel_name=str(getattr(message.channel, "name", "")),
+                guild_id=str(message.guild.id) if message.guild else "",
+                group_id=str(message.channel.id),
+            )
+        )
+
+        for response in decision.responses:
+            try:
+                await message.channel.send(response)
+            except Exception as exc:
+                print(f"[discord] auth reply error: {exc}")
+        for notification in decision.notifications:
+            try:
+                channel = client.get_channel(int(notification.chat_id))
+                if channel is None:
+                    channel = await client.fetch_channel(int(notification.chat_id))
+                if channel:
+                    await channel.send(notification.text)
+            except Exception as exc:
+                print(f"[discord] auth notify error: {exc}")
+        if not decision.allow_publish:
+            return None
 
         bus.publish_inbound(InboundMessage(
             channel="discord",
             chat_id=str(message.channel.id),
             user_id=str(message.author.id),
             text=message.content,
+            metadata=decision.metadata,
         ))
 
     # Outbound send loop
@@ -51,6 +98,8 @@ async def start_discord_channel() -> bool:
             msg: OutboundMessage = await q.get()
             try:
                 channel = client.get_channel(int(msg.chat_id))
+                if channel is None:
+                    channel = await client.fetch_channel(int(msg.chat_id))
                 if channel:
                     # Discord 2000 char limit
                     text = msg.text

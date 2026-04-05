@@ -248,6 +248,64 @@ All agents share the same memory graph. DevOps leaving a fact about a failed dep
 
 Configure in `~/.graphclaw/config.json` or via `install.sh`.
 
+### Safer Telegram / Discord defaults
+
+Telegram and Discord now default to a safer OpenClaw-style posture:
+
+- `dm_policy: "pairing"` — unknown DM senders get a one-time pairing code instead of immediate access
+- persistent DM approvals in `~/.graphclaw/credentials/<channel>-allowFrom.json`
+- persistent pending requests in `~/.graphclaw/credentials/<channel>-pairing.json`
+- `group_policy: "allowlist"` — groups stay blocked until explicitly allowlisted
+- group replies require a mention by default
+
+Example config:
+
+```json
+{
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "bot_token": "123:abc",
+      "owner_ids": ["123456789"],
+      "dm_policy": "pairing",
+      "allow_from": ["123456789"],
+      "group_policy": "allowlist",
+      "group_allow_from": ["123456789"],
+      "groups": {
+        "*": { "requireMention": true },
+        "-1001234567890": { "allow": true, "requireMention": false }
+      }
+    },
+    "discord": {
+      "enabled": true,
+      "bot_token": "discord-token",
+      "owner_ids": ["555555555555555555"],
+      "dm_policy": "pairing",
+      "group_policy": "allowlist",
+      "guilds": {
+        "123456789012345678": {
+          "channels": {
+            "*": { "allow": true, "requireMention": true },
+            "987654321098765432": { "allow": true, "requireMention": false }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Owner approval commands:
+
+- `pairing list`
+- `pairing approve <code>`
+
+Troubleshooting:
+
+- If DMs keep returning pairing codes, run `pairing list` from an owner account and approve the pending code.
+- If group messages are ignored, add the group/channel to `groups` / `guilds`, or set `group_policy` to `"open"`.
+- If approvals cannot happen, set `channels.<provider>.owner_ids` (or `allow_from`) so an owner can issue `pairing approve <code>`.
+
 ---
 
 ## Providers
