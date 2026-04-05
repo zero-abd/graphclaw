@@ -219,9 +219,13 @@ with entry {
 
     print("[graphclaw] ready")
 
-    if not channels_started:
+    interactive_cli_enabled = bool(sys.stdin and sys.stdin.isatty())
+    if interactive_cli_enabled:
         async def cli_loop():
-            print("Type your message (Ctrl+C to exit):")
+            if channels_started:
+                print("[graphclaw] local CLI enabled — use it for chat or pairing commands (Ctrl+C to exit):")
+            else:
+                print("Type your message (Ctrl+C to exit):")
             while True:
                 try:
                     text = await loop.run_in_executor(None, input, "> ")

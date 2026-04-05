@@ -1,10 +1,13 @@
 from pathlib import Path
 import sys
+import importlib
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from graphclaw import update_manager
+from graphclaw import update_manager as _update_manager
+
+update_manager = importlib.reload(_update_manager)
 
 
 def test_update_manager_reinstalls_with_channel_extras(monkeypatch, tmp_path):
