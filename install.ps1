@@ -448,6 +448,7 @@ Write-Color "  Dev tool integrations:" DarkGray
 Write-Host ""
 hint "Base44 uses the official Base44 CLI flow. On first use, Graphclaw can call `base44` (or `npx --yes base44@latest`) and may prompt you to log in."
 hint "Loveable uses official Build with URL links, so no API key is required for the fast website-generation flow."
+hint "If you want screenshot progress updates, Graphclaw will install a Playwright Chromium browser runtime on first use."
 $Base44Key = ""
 $LoveableKey = ""
 
