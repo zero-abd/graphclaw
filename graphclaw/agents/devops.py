@@ -59,8 +59,7 @@ class _ListSkillsTool:
 class _InvokeSkillTool:
     name = "invoke_skill"
     description = (
-        "Invoke an installed native skill function, or retrieve instructions for a "
-        "ClawHub SKILL.md skill."
+        "Read an installed OpenClaw/ClawHub SKILL.md skill for the current task, or invoke a legacy native skill when explicitly requested."
     )
     parameters = {
         "type": "object",

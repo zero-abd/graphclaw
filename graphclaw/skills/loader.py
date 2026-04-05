@@ -12,56 +12,123 @@ from graphclaw.config.loader import load_config
 CLAWHUB_BASE = "https://clawhub.ai"
 
 
-def _skills_dir() -> Path:
+def _workspace_root() -> Path:
+    cfg = load_config()
+    return Path(cfg.workspace)
+
+
+def _workspace_skills_dir() -> Path:
+    return _workspace_root() / "skills"
+
+
+def _shared_skills_dir() -> Path:
+    return Path.home() / ".graphclaw" / "skills"
+
+
+def _legacy_installed_dir() -> Path:
     cfg = load_config()
     p = cfg.skills.installed_path
     if p:
         return Path(p)
-    return Path(cfg.workspace) / "skills" / "installed"
+    return _workspace_root() / "skills" / "installed"
+
+
+def _skills_dir() -> Path:
+    return _workspace_skills_dir()
 
 
 def _builtin_skills_dir() -> Path:
     return Path(__file__).parent / "registry"
 
 
+def _clawhub_dir() -> Path:
+    return _workspace_root() / ".clawhub"
+
+
+def _lock_path() -> Path:
+    return _clawhub_dir() / "lock.json"
+
+
+def _skill_search_paths() -> list[Path]:
+    return [_workspace_skills_dir(), _shared_skills_dir(), _legacy_installed_dir(), _builtin_skills_dir()]
+
+
+def _read_lock() -> dict[str, Any]:
+    path = _lock_path()
+    if not path.exists():
+        return {"skills": {}}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {"skills": {}}
+    if not isinstance(data, dict):
+        return {"skills": {}}
+    data.setdefault("skills", {})
+    return data
+
+
+def _write_lock(payload: dict[str, Any]) -> None:
+    path = _lock_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _update_lock(slug: str, *, source: str, version: str = "latest", skill_type: str = "skill") -> None:
+    payload = _read_lock()
+    payload.setdefault("skills", {})[slug] = {
+        "source": source,
+        "version": version,
+        "type": skill_type,
+    }
+    _write_lock(payload)
+
+
 def list_skills() -> List[Dict[str, Any]]:
-    """List all installed skills (builtin + user-installed)."""
+    """List all installed skills using OpenClaw-style search precedence."""
     skills = []
-    for base in [_builtin_skills_dir(), _skills_dir()]:
+    seen = set()
+    lock = _read_lock().get("skills", {})
+    for base in _skill_search_paths():
         if not base.is_dir():
             continue
         for entry in sorted(base.iterdir()):
-            if not entry.is_dir():
+            if not entry.is_dir() or entry.name.startswith('.'):
+                continue
+            if entry.name in seen:
                 continue
             meta_file = entry / "skill.json"
             md_file = entry / "SKILL.md"
             if meta_file.exists():
                 try:
                     meta = json.loads(meta_file.read_text(encoding="utf-8"))
+                    seen.add(entry.name)
                     skills.append({
                         "name": meta.get("name", entry.name),
                         "slug": entry.name,
                         "type": "native",
                         "description": meta.get("description", ""),
                         "path": str(entry),
+                        "source": lock.get(entry.name, {}).get("source", "bundled" if base == _builtin_skills_dir() else "local"),
                     })
                 except Exception:
                     pass
             elif md_file.exists():
                 front = _parse_frontmatter(md_file.read_text(encoding="utf-8"))
+                seen.add(entry.name)
                 skills.append({
                     "name": front.get("name", entry.name),
                     "slug": entry.name,
-                    "type": "clawhub",
+                    "type": "skill",
                     "description": front.get("description", ""),
                     "path": str(entry),
+                    "source": lock.get(entry.name, {}).get("source", "local"),
                 })
     return skills
 
 
 def list_native_skill_functions(slug: str) -> List[str]:
     """Return callable public functions exposed by a native skill."""
-    for base in [_builtin_skills_dir(), _skills_dir()]:
+    for base in _skill_search_paths():
         skill_dir = base / slug
         meta_file = skill_dir / "skill.json"
         py_file = skill_dir / "skill.py"
@@ -109,7 +176,7 @@ async def search_clawhub(query: str) -> List[Dict[str, Any]]:
 
 async def install_skill(source: str) -> str:
     """Install a skill from ClawHub slug or GitHub URL."""
-    dest = _skills_dir()
+    dest = _workspace_skills_dir()
     dest.mkdir(parents=True, exist_ok=True)
 
     if source.startswith("http"):
@@ -125,7 +192,8 @@ async def install_skill(source: str) -> str:
         )
         if result.returncode != 0:
             return f"Failed to clone: {result.stderr}"
-        return f"Installed '{slug}' from GitHub to {target}"
+        _update_lock(slug, source=source, version="git", skill_type="skill")
+        return f"Installed '{slug}' from GitHub to {target}. Start a new session to load it."
     else:
         # ClawHub slug
         slug = source.strip("/")
@@ -150,7 +218,8 @@ async def install_skill(source: str) -> str:
                 (target / "skill.json").write_text(
                     json.dumps(data["metadata"], indent=2), encoding="utf-8"
                 )
-            return f"Installed '{slug}' from ClawHub to {target}"
+            _update_lock(slug, source="clawhub", version=str(data.get("version", "latest")), skill_type="skill")
+            return f"Installed '{slug}' from ClawHub to {target}. Start a new session to load it."
         except ImportError:
             return "Error: aiohttp not installed"
         except Exception as e:
@@ -159,7 +228,7 @@ async def install_skill(source: str) -> str:
 
 def invoke_skill(slug: str, function_name: str = "", **kwargs: Any) -> str:
     """Invoke a native skill function or return ClawHub instructions."""
-    for base in [_builtin_skills_dir(), _skills_dir()]:
+    for base in _skill_search_paths():
         skill_dir = base / slug
         if not skill_dir.is_dir():
             continue
@@ -191,7 +260,7 @@ def invoke_skill(slug: str, function_name: str = "", **kwargs: Any) -> str:
 
 async def invoke_skill_async(slug: str, function_name: str = "", **kwargs: Any) -> str:
     """Invoke a native skill function asynchronously or return ClawHub instructions."""
-    for base in [_builtin_skills_dir(), _skills_dir()]:
+    for base in _skill_search_paths():
         skill_dir = base / slug
         if not skill_dir.is_dir():
             continue
