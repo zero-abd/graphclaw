@@ -1,10 +1,30 @@
 """Telegram channel integration using python-telegram-bot."""
 from __future__ import annotations
 import asyncio
+import logging
 import sys
 from graphclaw.channels.bus import bus, InboundMessage, OutboundMessage
 from graphclaw.channels.auth import AuthEvent, ChannelAuthManager
 from graphclaw.config.loader import load_config
+
+
+def _configure_telegram_logging() -> None:
+    for logger_name in ("httpx", "httpcore", "telegram", "telegram.ext"):
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+
+def _print_onboarding(bot_username: str, auth: ChannelAuthManager) -> None:
+    if not bot_username:
+        return
+    bot_handle = f"@{bot_username}"
+    bot_url = f"https://t.me/{bot_username}"
+    print(f"[telegram] bot ready: {bot_handle}")
+    print(f"[telegram] first-use: open {bot_url}")
+    print("[telegram] first-use: press Start in Telegram, then send any message to begin the DM")
+    if auth.dm_policy == "pairing":
+        print("[telegram] first-use: if you receive a pairing code, approve it here in this terminal with:")
+        print("[telegram]            pairing list telegram")
+        print("[telegram]            pairing approve telegram <code>")
 
 
 async def start_telegram_channel() -> bool:
@@ -23,6 +43,7 @@ async def start_telegram_channel() -> bool:
         print(f"[telegram] python-telegram-bot not installed — install it with: {sys.executable} -m pip install 'python-telegram-bot>=21.0'")
         return False
 
+    _configure_telegram_logging()
     app = ApplicationBuilder().token(token).build()
     auth = ChannelAuthManager("telegram", ch)
 
@@ -33,6 +54,7 @@ async def start_telegram_channel() -> bool:
     me = await app.bot.get_me()
     bot_id = str(me.id)
     bot_username = (me.username or "").lstrip("@").lower()
+    _print_onboarding(bot_username, auth)
 
     async def _send_auth_message(chat_id: str, text: str) -> None:
         try:
