@@ -25,7 +25,164 @@ def _now() -> str:
 
 def _workspace() -> Path:
     ensure_workspace()
-    return Path(load_config().workspace)
+    workspace = Path(load_config().workspace)
+    _ensure_core_memory_graph(workspace)
+    return workspace
+
+
+def _ensure_core_memory_graph(workspace: Path) -> None:
+    workspace.mkdir(parents=True, exist_ok=True)
+    memory_dir = workspace / "memory"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    profile_path = memory_dir / PROFILE_FILE
+    memories_path = memory_dir / MEMORY_FILE
+
+    cfg = load_config()
+    now = _now()
+    profile = _load_json(profile_path, {})
+    if not isinstance(profile, dict):
+        profile = {}
+
+    assistant_name = str(profile.get("assistant_name") or "Graphclaw").strip() or "Graphclaw"
+    identity = str(
+        profile.get("identity")
+        or "Graph-native multi-agent AI platform powered by Jac OSP."
+    ).strip()
+    soul = str(
+        profile.get("soul")
+        or "Helpful, careful, graph-native, and memory-aware."
+    ).strip()
+
+    profile_changed = False
+    profile_defaults = {
+        "created_at": now,
+        "assistant_name": assistant_name,
+        "display_name": assistant_name,
+        "identity": identity,
+        "soul": soul,
+        "timezone": "UTC",
+        "preferred_model": cfg.agents.model,
+        "dream_interval_hours": int(cfg.agents.dream.interval_hours),
+    }
+    for key, value in profile_defaults.items():
+        if profile.get(key) in {None, ""}:
+            profile[key] = value
+            profile_changed = True
+
+    memories = _load_json(memories_path, [])
+    if not isinstance(memories, list):
+        memories = []
+
+    memories_changed = False
+
+    def upsert_system_memory(
+        system_key: str,
+        content: str,
+        *,
+        topics: List[str],
+        relationship: str = "",
+    ) -> str:
+        nonlocal memories_changed
+        existing = next(
+            (item for item in memories if str(item.get("system_key", "")) == system_key),
+            None,
+        )
+        normalized_topics = sorted({topic.strip().lower() for topic in topics if topic.strip()})
+        if existing is None:
+            existing = {
+                "id": str(uuid.uuid4()),
+                "content": content,
+                "mem_type": "Reference",
+                "confidence": 1.0,
+                "decay_rate": 0.0,
+                "created_at": now,
+                "updated_at": now,
+                "last_validated_at": now,
+                "source_session": "",
+                "agent": "system",
+                "tombstoned": False,
+                "topics": normalized_topics,
+                "relationships": [],
+                "system_key": system_key,
+                "bootstrap_relationship": relationship,
+            }
+            memories.append(existing)
+            memories_changed = True
+            return str(existing["id"])
+
+        desired = {
+            "content": content,
+            "mem_type": "Reference",
+            "agent": "system",
+            "tombstoned": False,
+            "topics": normalized_topics,
+            "system_key": system_key,
+            "bootstrap_relationship": relationship,
+        }
+        for key, value in desired.items():
+            if existing.get(key) != value:
+                existing[key] = value
+                existing["updated_at"] = now
+                existing["last_validated_at"] = now
+                memories_changed = True
+        return str(existing["id"])
+
+    root_id = upsert_system_memory(
+        "assistant_root",
+        f"{assistant_name} root node",
+        topics=["assistant", "root", "identity"],
+    )
+    name_id = upsert_system_memory(
+        "assistant_name",
+        f"Name: {assistant_name}",
+        topics=["assistant", "identity", "name"],
+        relationship="has_name",
+    )
+    identity_id = upsert_system_memory(
+        "assistant_identity",
+        f"Identity: {identity}",
+        topics=["assistant", "identity"],
+        relationship="has_identity",
+    )
+    soul_id = upsert_system_memory(
+        "assistant_soul",
+        f"Soul: {soul}",
+        topics=["assistant", "soul"],
+        relationship="has_soul",
+    )
+    dream_id = upsert_system_memory(
+        "assistant_dream_cadence",
+        f"Dream cadence: every {int(cfg.agents.dream.interval_hours)} hours",
+        topics=["assistant", "dream", "maintenance"],
+        relationship="runs_dream_cycle",
+    )
+
+    root_node = next(
+        (item for item in memories if str(item.get("system_key", "")) == "assistant_root"),
+        None,
+    )
+    if root_node is not None:
+        relationships = _ensure_memory_relationships(root_node)
+        desired_relationships = [
+            {"to": name_id, "relationship": "has_name", "weight": 1.0},
+            {"to": identity_id, "relationship": "has_identity", "weight": 1.0},
+            {"to": soul_id, "relationship": "has_soul", "weight": 1.0},
+            {"to": dream_id, "relationship": "runs_dream_cycle", "weight": 1.0},
+        ]
+        for relation in desired_relationships:
+            if relation not in relationships:
+                relationships.append(relation)
+                root_node["updated_at"] = now
+                memories_changed = True
+
+    if profile.get("root_memory_id") != root_id:
+        profile["root_memory_id"] = root_id
+        profile_changed = True
+
+    if profile_changed:
+        _save_json(profile_path, profile)
+    if memories_changed:
+        _save_json(memories_path, memories)
 
 
 def _memory_dir() -> Path:

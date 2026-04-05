@@ -65,7 +65,7 @@ def dashboard_url() -> str:
 
 def dashboard_api_url() -> str:
     cfg = _dashboard_config()
-    return f"http://{cfg['host']}:{cfg['port']}/api/overview"
+    return f"http://{cfg['host']}:{cfg['port'] + 1}/"
 
 
 def _jac_executable() -> str:
@@ -157,15 +157,7 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
     env = _with_repo_on_pythonpath(dict(os.environ))
     env.setdefault("GRAPHCLAW_CONFIG_PATH", os.environ.get("GRAPHCLAW_CONFIG_PATH", ""))
     env.setdefault("GRAPHCLAW_HOME", str(_graphclaw_home()))
-    cmd = [
-        sys.executable,
-        "-m",
-        "graphclaw.dashboard_server",
-        "--host",
-        cfg["host"],
-        "--port",
-        str(cfg["port"]),
-    ]
+    cmd = [_jac_executable(), "start", "--dev", "--port", str(cfg["port"])]
     proc = subprocess.Popen(
         cmd,
         cwd=str(_dashboard_project_root()),
@@ -201,7 +193,8 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
 
     if proc.poll() is None and _is_dashboard_reachable(api_url):
         raise RuntimeError(
-            "Dashboard API started, but the web UI did not become reachable.\n"
+            "Dashboard API started, but the web UI did not become reachable. "
+            "Make sure jac-client and bun are installed, then try again.\n"
             + _recent_log_excerpt()
         )
 
