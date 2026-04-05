@@ -419,6 +419,3 @@ fi
 echo -e "  ${W}2. Start graphclaw:${NC}"
 echo -e "       ${W}graphclaw${NC}"
 echo ""
-echo -e "  ${D}Or run directly without reloading:${NC}"
-echo -e "       ${W}~/.graphclaw/run.sh${NC}"
-echo ""

@@ -86,16 +86,12 @@ Then start:
 ```bash
 source ~/.bashrc       # or ~/.zshrc — reload your shell once
 graphclaw              # interactive CLI
-# or run directly without reloading:
-~/.graphclaw/run.sh
 ```
 
 **Windows:**
 ```powershell
 . $PROFILE             # reload your PowerShell profile once
 graphclaw              # interactive CLI
-# or run directly:
-~\.graphclaw\run.bat
 ```
 
 ---

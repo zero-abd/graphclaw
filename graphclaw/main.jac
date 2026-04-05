@@ -16,7 +16,7 @@ def dispatch_message(msg: InboundMessage) {
     import asyncio
     import traceback
 
-    from graphclaw.agents.coordinator import CoordinatorAgent
+    from graphclaw.agents.coordinator_runtime import run_coordinator
     from graphclaw.memory.backend import append_turn, consolidate_session, get_memory_context, start_session
 
     def _extract_content(result: object) -> str:
@@ -44,12 +44,12 @@ def dispatch_message(msg: InboundMessage) {
             if memory_context:
                 query = f"Memory context:\n{memory_context}\n\nUser message:\n{msg.text}"
 
-            result = CoordinatorAgent(
+            result = await run_coordinator(
                 query=query,
                 channel=msg.channel,
                 chat_id=msg.chat_id,
                 user_id=msg.user_id,
-            ).spawn(root())
+            )
             content = _extract_content(result)
 
             append_turn(session_id=session_id, role="assistant", content=content)
