@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 from graphclaw.agents.base import BaseAgent
+from graphclaw.mcp.tooling import attach_mcp_runtime
 from graphclaw.tools.filesystem import ReadFileTool, WriteFileTool, ListDirTool
 from graphclaw.tools.platform_builders import builder_platform_tools
 from graphclaw.tools.shell import ShellTool
@@ -104,3 +105,4 @@ class DevOpsAgent(BaseAgent):
             _SearchClawHubTool(), _InstallSkillTool(), _UpdateSkillTool(), _UpdateAllSkillsTool(),
         ]
         attach_skill_runtime(self)
+        attach_mcp_runtime(self)

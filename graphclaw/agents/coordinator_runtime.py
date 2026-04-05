@@ -14,6 +14,7 @@ from graphclaw.agents.builder import BuilderAgent
 from graphclaw.agents.devops import DevOpsAgent
 from graphclaw.agents.planner import PlannerAgent
 from graphclaw.agents.researcher import ResearcherAgent
+from graphclaw.mcp.tooling import attach_mcp_runtime
 from graphclaw.skills.tooling import attach_skill_runtime
 from graphclaw.tools.web import WebFetchTool, WebSearchTool
 
@@ -66,6 +67,7 @@ async def run_coordinator(
         )
         agent.tools = [WebSearchTool(), WebFetchTool()]
         attach_skill_runtime(agent)
+        attach_mcp_runtime(agent)
     else:
         agent.system_prompt = prefix + " " + agent.system_prompt
     return await agent.run()
