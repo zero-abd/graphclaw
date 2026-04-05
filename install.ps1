@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 #  Graphclaw Windows Installer (PowerShell)
 #  Usage (one-liner, run in PowerShell as Administrator):
-#    irm https://raw.githubusercontent.com/graphclaw/graphclaw/main/install.ps1 | iex
+#    irm https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.ps1 | iex
 #  Or locally:
 #    .\install.ps1
 # ─────────────────────────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ $CloneDir  = "$env:TEMP\graphclaw"
 if (-not $ScriptDir -or -not (Test-Path "$ScriptDir\pyproject.toml")) {
     info "Cloning graphclaw repository..."
     if (Get-Command git -ErrorAction SilentlyContinue) {
-        git clone --depth 1 https://github.com/graphclaw/graphclaw $CloneDir -q 2>$null
+        git clone --depth 1 https://github.com/zero-abd/graphclaw $CloneDir -q 2>$null
         ok "Cloned to $CloneDir"
         $ScriptDir = $CloneDir
     } else {
@@ -270,7 +270,7 @@ $ConfigJson = @"
     "secret_key": "$JwtSecret"
   },
   "skills": {
-    "registry_url": "https://raw.githubusercontent.com/graphclaw/skills-registry/main/index.json",
+    "registry_url": "https://clawhub.ai/api/v1",
     "installed_path": "$($GraphclawDir -replace '\\','\\')\\skills\\installed"
   }
 }

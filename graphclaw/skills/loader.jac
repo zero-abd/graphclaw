@@ -20,12 +20,17 @@ node SkillNode {
     has description: str = "";
     has version: str = "0.1.0";
     has author: str = "";
-    has tools: list[str] = [];          # tool function names this skill exposes
+    has tools: list[str] = [];          # tool function names this skill exposes (native skills only)
     has requirements: list[str] = [];   # pip packages needed
     has source_url: str = "";
     has skill_path: str = "";           # filesystem path to skill directory
     has enabled: bool = True;
     has installed_at: str = "";
+    # ClawHub skill fields
+    has skill_type: str = "native";     # "native" | "clawhub"
+    has instructions: str = "";         # SKILL.md body (clawhub skills)
+    has env_vars: list[str] = [];       # required env vars from SKILL.md frontmatter
+    has required_bins: list[str] = [];  # required binaries from SKILL.md frontmatter
 
     def postinit {
         if not self.installed_at {
@@ -45,11 +50,11 @@ edge HasSkill {}
 #   "author": "graphclaw",
 #   "tools": ["deploy_app", "get_app_status", "get_build_logs", "update_env_vars"],
 #   "requirements": [],
-#   "source_url": "https://github.com/graphclaw/skills-registry/tree/main/base44"
+#   "source_url": "https://clawhub.ai/skills/base44"
 # }
 
 glob BUILTIN_SKILLS_DIR: str = str(Path(__file__).parent / "registry");
-glob REGISTRY_INDEX_URL: str = "https://raw.githubusercontent.com/graphclaw/skills-registry/main/index.json";
+glob CLAWHUB_BASE_URL: str = "https://clawhub.ai";
 
 # ── Scan and register built-in + installed skills ─────────────────────────────
 
@@ -58,23 +63,18 @@ walker LoadSkills {
         cfg = load_config();
         installed_dir = Path(cfg.skills.installed_path).expanduser();
 
-        dirs_to_scan = [
-            Path(BUILTIN_SKILLS_DIR),
-            installed_dir
-        ];
-
         loaded = [];
-        for skills_dir in dirs_to_scan {
-            if not skills_dir.exists() { continue; }
-            for skill_dir in skills_dir.iterdir() {
+
+        # ── Built-in native skills (skill.json + skill.py) ─────────────────
+        builtin_dir = Path(BUILTIN_SKILLS_DIR);
+        if builtin_dir.exists() {
+            for skill_dir in builtin_dir.iterdir() {
                 if not skill_dir.is_dir() { continue; }
                 manifest_path = skill_dir / "skill.json";
                 if not manifest_path.exists() { continue; }
 
                 manifest = loads(manifest_path.read_text());
                 name = manifest.get("name", skill_dir.name);
-
-                # Skip if already loaded
                 existing = [here -->(:HasSkill:)--> (:SkillNode)][? name == name];
                 if existing { continue; }
 
@@ -86,12 +86,83 @@ walker LoadSkills {
                     tools=manifest.get("tools", []),
                     requirements=manifest.get("requirements", []),
                     source_url=manifest.get("source_url", ""),
-                    skill_path=str(skill_dir)
+                    skill_path=str(skill_dir),
+                    skill_type="native"
                 );
                 here +:HasSkill:+> sn;
                 loaded.append(name);
             }
         }
+
+        # ── User-installed skills: native (skill.json) or ClawHub (SKILL.md) ─
+        if installed_dir.exists() {
+            for skill_dir in installed_dir.iterdir() {
+                if not skill_dir.is_dir() { continue; }
+                name = skill_dir.name;
+                existing = [here -->(:HasSkill:)--> (:SkillNode)][? name == name];
+                if existing { continue; }
+
+                native_manifest = skill_dir / "skill.json";
+                clawhub_manifest = skill_dir / "SKILL.md";
+
+                if native_manifest.exists() {
+                    manifest = loads(native_manifest.read_text());
+                    sn = SkillNode(
+                        name=manifest.get("name", name),
+                        description=manifest.get("description", ""),
+                        version=manifest.get("version", "0.1.0"),
+                        author=manifest.get("author", ""),
+                        tools=manifest.get("tools", []),
+                        requirements=manifest.get("requirements", []),
+                        source_url=manifest.get("source_url", ""),
+                        skill_path=str(skill_dir),
+                        skill_type="native"
+                    );
+                    here +:HasSkill:+> sn;
+                    loaded.append(manifest.get("name", name));
+                } elif clawhub_manifest.exists() {
+                    ::py::
+                    import yaml, re
+                    raw = clawhub_manifest.read_text(encoding="utf-8", errors="replace")
+                    match = re.match(r'^---\n(.*?)\n---\n?(.*)', raw, re.DOTALL)
+                    if match:
+                        try:
+                            _fm = yaml.safe_load(match.group(1)) or {}
+                        except Exception:
+                            _fm = {}
+                        _body = match.group(2).strip()
+                    else:
+                        _fm = {}
+                        _body = raw.strip()
+                    _openclaw = (_fm.get("metadata") or {}).get("openclaw", {})
+                    _req = _openclaw.get("requires") or {}
+                    _env_vars = _req.get("env", [])
+                    _bins = _req.get("bins", [])
+                    _ch_name = _fm.get("name", name)
+                    _ch_desc = _fm.get("description", "")
+                    _ch_version = str(_fm.get("version", "0.1.0"))
+                    _ch_author = str(_fm.get("author", ""))
+                    ::py::
+                    sn = SkillNode(
+                        name=_ch_name,
+                        description=_ch_desc,
+                        version=_ch_version,
+                        author=_ch_author,
+                        tools=[],
+                        requirements=[],
+                        source_url=f"{CLAWHUB_BASE_URL}/skills/{name}",
+                        skill_path=str(skill_dir),
+                        skill_type="clawhub",
+                        instructions=_body,
+                        env_vars=_env_vars,
+                        required_bins=_bins
+                    );
+                    here +:HasSkill:+> sn;
+                    loaded.append(_ch_name);
+                }
+            }
+        }
+
         report loaded;
     }
 }
@@ -106,8 +177,17 @@ walker ListSkills {
         if self.enabled_only {
             skills = [s for s in skills if s.enabled];
         }
-        report [{"name": s.name, "description": s.description,
-                 "version": s.version, "tools": s.tools} for s in skills];
+        report [{
+            "name": s.name,
+            "description": s.description,
+            "version": s.version,
+            "tools": s.tools,
+            "skill_type": s.skill_type,
+            "instructions": s.instructions,
+            "env_vars": s.env_vars,
+            "required_bins": s.required_bins,
+            "source_url": s.source_url
+        } for s in skills];
     }
 }
 
@@ -129,7 +209,7 @@ walker GetSkill {
 
 walker InvokeSkillTool {
     has skill_name: str;
-    has tool_name: str;
+    has tool_name: str;    # ignored for clawhub skills
     has params: dict = {};
 
     can invoke with `root entry {
@@ -142,14 +222,29 @@ walker InvokeSkillTool {
         }
         sk = skills[0];
 
+        # ── ClawHub skill: return instructions for the agent to follow ──────
+        if sk.skill_type == "clawhub" {
+            task = self.params.get("task", "(no task specified)");
+            env_note = "";
+            if sk.env_vars {
+                env_note = f"\n\n**Required environment variables:** {', '.join(sk.env_vars)}";
+            }
+            bins_note = "";
+            if sk.required_bins {
+                bins_note = f"\n**Required binaries:** {', '.join(sk.required_bins)}";
+            }
+            report f"# Skill: {sk.name}\n\n{sk.instructions}{env_note}{bins_note}\n\n## Your Task\n{task}\n\nUse your shell, web_fetch, web_search, read_file, and write_file tools to complete this task by following the instructions above.";
+            disengage;
+        }
+
+        # ── Native skill: dynamically import and call Python function ────────
         if self.tool_name not in sk.tools {
             report {"error": f"Tool '{self.tool_name}' not found in skill '{self.skill_name}'"};
             disengage;
         }
 
-        # Dynamically import the skill module and call the tool function
         ::py::
-        import importlib.util, sys, os, pathlib
+        import importlib.util, pathlib
         skill_path = pathlib.Path(sk.skill_path)
         mod_file = skill_path / "skill.py"
         if not mod_file.exists():
@@ -164,12 +259,17 @@ walker InvokeSkillTool {
             if tool_fn:
                 import asyncio, inspect
                 if inspect.iscoroutinefunction(tool_fn):
-                    result = asyncio.get_event_loop().run_until_complete(
-                        tool_fn(**self.params)
-                    )
+                    try:
+                        loop = asyncio.get_running_loop()
+                        import concurrent.futures
+                        with concurrent.futures.ThreadPoolExecutor() as pool:
+                            _invoke_result = pool.submit(
+                                asyncio.run, tool_fn(**self.params)
+                            ).result()
+                    except RuntimeError:
+                        _invoke_result = asyncio.run(tool_fn(**self.params))
                 else:
-                    result = tool_fn(**self.params)
-                _invoke_result = result
+                    _invoke_result = tool_fn(**self.params)
             else:
                 _invoke_result = {"error": f"Function '{self.tool_name}' not found in skill module"}
         else:
@@ -180,123 +280,239 @@ walker InvokeSkillTool {
     }
 }
 
-# ── Fetch skill index from online registry ─────────────────────────────────────
+# ── Search ClawHub registry ────────────────────────────────────────────────────
 
-walker FetchRegistryIndex {
-    can fetch with `root entry {
+walker SearchClawHub {
+    has query: str;
+    has limit: int = 10;
+
+    can search with `root entry {
         ::py::
         import httpx
         try:
-            resp = httpx.get(REGISTRY_INDEX_URL, timeout=10.0)
+            resp = httpx.get(
+                f"{CLAWHUB_BASE_URL}/api/v1/search",
+                params={"q": self.query},
+                timeout=10.0
+            )
             resp.raise_for_status()
-            _index = resp.json()
+            data = resp.json()
+            _results = data.get("items", data) if isinstance(data, dict) else data
         except Exception as e:
-            _index = {"error": str(e), "skills": []}
+            _results = {"error": str(e)}
         ::py::
-        report _index;
+        report _results;
     }
 }
 
-# ── Install a skill from online registry or GitHub URL ────────────────────────
+# ── List skills on ClawHub ─────────────────────────────────────────────────────
+
+walker ListClawHubSkills {
+    has limit: int = 20;
+    has offset: int = 0;
+
+    can list with `root entry {
+        ::py::
+        import httpx
+        try:
+            resp = httpx.get(
+                f"{CLAWHUB_BASE_URL}/api/v1/skills",
+                params={"limit": self.limit, "offset": self.offset},
+                timeout=10.0
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            _results = data.get("items", data) if isinstance(data, dict) else data
+        except Exception as e:
+            _results = {"error": str(e)}
+        ::py::
+        report _results;
+    }
+}
+
+# ── Install a skill — ClawHub slug or direct GitHub URL ───────────────────────
 
 walker InstallSkill {
-    has source: str;   # "base44" | "graphclaw/base44" | "https://github.com/..."
+    has source: str;   # "kubernetes" | "https://github.com/org/repo/..."
     has force: bool = False;
 
     can install with `root entry {
+        # If it's a URL, treat as a GitHub release ZIP (native skill.json format)
+        if self.source.startswith("http") {
+            report self._install_from_url(here);
+            disengage;
+        }
+        # Otherwise, treat as a ClawHub slug
+        report self._install_from_clawhub(here);
+    }
+
+    def _install_from_clawhub(graph_root) -> dict {
         cfg = load_config();
         installed_dir = Path(cfg.skills.installed_path).expanduser();
         installed_dir.mkdir(parents=True, exist_ok=True);
 
-        # Resolve source → download URL
-        download_url = self._resolve_url(self.source);
-        if not download_url {
-            report {"error": f"Cannot resolve skill source: {self.source}"};
-            disengage;
-        }
-
         ::py::
-        import httpx, zipfile, io, json, pathlib, shutil
+        import httpx, zipfile, io, pathlib, shutil, yaml, re
 
-        # Download zip/tarball from GitHub
-        try:
-            resp = httpx.get(download_url, timeout=30.0, follow_redirects=True)
-            resp.raise_for_status()
-        except Exception as e:
-            _install_result = {"error": f"Download failed: {e}"}
-            _installed = False
+        slug = self.source
+        installed_dir_py = pathlib.Path(str(installed_dir))
+        target_dir = installed_dir_py / slug
+
+        if target_dir.exists() and not self.force:
+            _ch_result = {"error": f"Skill '{slug}' already installed. Use force=True to reinstall."}
+            _ch_ok = False
         else:
-            # Extract
             try:
-                z = zipfile.ZipFile(io.BytesIO(resp.content))
-                # Find skill.json inside zip to get the skill name
-                manifest_entry = next(
-                    (n for n in z.namelist() if n.endswith("skill.json")), None
+                resp = httpx.get(
+                    f"{CLAWHUB_BASE_URL}/api/v1/download",
+                    params={"slug": slug},
+                    timeout=30.0,
+                    follow_redirects=True
                 )
-                if not manifest_entry:
-                    _install_result = {"error": "No skill.json found in archive"}
-                    _installed = False
-                else:
-                    manifest = json.loads(z.read(manifest_entry))
-                    skill_name = manifest.get("name", self.source.split("/")[-1])
-                    target_dir = pathlib.Path(str(installed_dir)) / skill_name
-
-                    if target_dir.exists() and not self.force:
-                        _install_result = {"error": f"Skill '{skill_name}' already installed. Use force=True to reinstall."}
-                        _installed = False
+                resp.raise_for_status()
+            except Exception as e:
+                _ch_result = {"error": f"Download from ClawHub failed: {e}"}
+                _ch_ok = False
+            else:
+                try:
+                    z = zipfile.ZipFile(io.BytesIO(resp.content))
+                    skill_md_entry = next(
+                        (n for n in z.namelist() if n.endswith("SKILL.md")), None
+                    )
+                    if not skill_md_entry:
+                        _ch_result = {"error": "No SKILL.md found in ClawHub archive"}
+                        _ch_ok = False
                     else:
+                        raw = z.read(skill_md_entry).decode("utf-8", errors="replace")
+                        match = re.match(r'^---\n(.*?)\n---\n?(.*)', raw, re.DOTALL)
+                        if match:
+                            try:
+                                _fm = yaml.safe_load(match.group(1)) or {}
+                            except Exception:
+                                _fm = {}
+                            _body = match.group(2).strip()
+                        else:
+                            _fm = {}
+                            _body = raw.strip()
+
+                        _openclaw_meta = (_fm.get("metadata") or {}).get("openclaw", {})
+                        _req = _openclaw_meta.get("requires") or {}
+
                         if target_dir.exists():
                             shutil.rmtree(target_dir)
                         target_dir.mkdir(parents=True)
 
-                        # Extract relevant files
-                        prefix = "/".join(manifest_entry.split("/")[:-1]) + "/"
+                        prefix = "/".join(skill_md_entry.split("/")[:-1])
+                        prefix = prefix + "/" if prefix else ""
                         for entry in z.namelist():
                             if entry.startswith(prefix) and not entry.endswith("/"):
                                 rel = entry[len(prefix):]
+                                if rel:
+                                    dest = target_dir / rel
+                                    dest.parent.mkdir(parents=True, exist_ok=True)
+                                    dest.write_bytes(z.read(entry))
+
+                        _ch_result = {
+                            "name": _fm.get("name", slug),
+                            "description": _fm.get("description", ""),
+                            "version": str(_fm.get("version", "0.1.0")),
+                            "author": str(_fm.get("author", "")),
+                            "instructions": _body,
+                            "env_vars": _req.get("env", []),
+                            "required_bins": _req.get("bins", []),
+                            "skill_path": str(target_dir)
+                        }
+                        _ch_ok = True
+                except Exception as e:
+                    _ch_result = {"error": f"Extraction failed: {e}"}
+                    _ch_ok = False
+        ::py::
+
+        if _ch_ok {
+            existing = [graph_root -->(:HasSkill:)--> (:SkillNode)][? name == _ch_result["name"]];
+            if existing { del existing[0]; }
+            sn = SkillNode(
+                name=_ch_result["name"],
+                description=_ch_result["description"],
+                version=_ch_result["version"],
+                author=_ch_result.get("author", ""),
+                tools=[],
+                requirements=[],
+                source_url=f"{CLAWHUB_BASE_URL}/skills/{self.source}",
+                skill_path=_ch_result["skill_path"],
+                skill_type="clawhub",
+                instructions=_ch_result["instructions"],
+                env_vars=_ch_result.get("env_vars", []),
+                required_bins=_ch_result.get("required_bins", [])
+            );
+            graph_root +:HasSkill:+> sn;
+            return {"success": True, "skill": _ch_result};
+        }
+        return _ch_result;
+    }
+
+    def _install_from_url(graph_root) -> dict {
+        cfg = load_config();
+        installed_dir = Path(cfg.skills.installed_path).expanduser();
+        installed_dir.mkdir(parents=True, exist_ok=True);
+
+        ::py::
+        import httpx, zipfile, io, json, pathlib, shutil
+        try:
+            resp = httpx.get(self.source, timeout=30.0, follow_redirects=True)
+            resp.raise_for_status()
+            z = zipfile.ZipFile(io.BytesIO(resp.content))
+            manifest_entry = next(
+                (n for n in z.namelist() if n.endswith("skill.json")), None
+            )
+            if not manifest_entry:
+                _url_result = {"error": "No skill.json found in archive"}
+                _url_ok = False
+            else:
+                manifest = json.loads(z.read(manifest_entry))
+                skill_name = manifest.get("name", self.source.split("/")[-1].replace(".zip",""))
+                target_dir = pathlib.Path(str(installed_dir)) / skill_name
+                if target_dir.exists() and not self.force:
+                    _url_result = {"error": f"Skill '{skill_name}' already installed"}
+                    _url_ok = False
+                else:
+                    if target_dir.exists():
+                        shutil.rmtree(target_dir)
+                    target_dir.mkdir(parents=True)
+                    prefix = "/".join(manifest_entry.split("/")[:-1]) + "/"
+                    for entry in z.namelist():
+                        if entry.startswith(prefix) and not entry.endswith("/"):
+                            rel = entry[len(prefix):]
+                            if rel:
                                 dest = target_dir / rel
                                 dest.parent.mkdir(parents=True, exist_ok=True)
                                 dest.write_bytes(z.read(entry))
-
-                        _install_result = manifest
-                        _installed = True
-            except Exception as e:
-                _install_result = {"error": f"Extraction failed: {e}"}
-                _installed = False
+                    manifest["skill_path"] = str(target_dir)
+                    _url_result = manifest
+                    _url_ok = True
+        except Exception as e:
+            _url_result = {"error": str(e)}
+            _url_ok = False
         ::py::
 
-        if _installed {
-            # Register the newly installed skill in the graph
+        if _url_ok {
+            existing = [graph_root -->(:HasSkill:)--> (:SkillNode)][? name == _url_result["name"]];
+            if existing { del existing[0]; }
             sn = SkillNode(
-                name=_install_result.get("name", self.source),
-                description=_install_result.get("description", ""),
-                version=_install_result.get("version", "0.1.0"),
-                author=_install_result.get("author", ""),
-                tools=_install_result.get("tools", []),
-                requirements=_install_result.get("requirements", []),
-                source_url=download_url,
-                skill_path=str(installed_dir / _install_result.get("name", self.source))
+                name=_url_result["name"],
+                description=_url_result.get("description", ""),
+                version=_url_result.get("version", "0.1.0"),
+                author=_url_result.get("author", ""),
+                tools=_url_result.get("tools", []),
+                requirements=_url_result.get("requirements", []),
+                source_url=self.source,
+                skill_path=_url_result["skill_path"],
+                skill_type="native"
             );
-            here +:HasSkill:+> sn;
-            report {"success": True, "skill": _install_result};
-        } else {
-            report _install_result;
+            graph_root +:HasSkill:+> sn;
+            return {"success": True, "skill": _url_result};
         }
-    }
-
-    def _resolve_url(source: str) -> str {
-        if source.startswith("https://") or source.startswith("http://") {
-            return source;
-        }
-        # Short name — look up in registry index
-        # Format: "org/name" or just "name" (assumes graphclaw org)
-        if "/" not in source {
-            source = f"graphclaw/{source}";
-        }
-        parts = source.split("/");
-        org = parts[0];
-        name = parts[1];
-        return f"https://github.com/{org}/skills-registry/archive/refs/heads/main/{name}.zip";
+        return _url_result;
     }
 }
 

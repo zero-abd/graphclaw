@@ -2,7 +2,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 #  Graphclaw Installer
 #  Usage (one-liner):
-#    curl -fsSL https://raw.githubusercontent.com/graphclaw/graphclaw/main/install.sh | bash
+#    curl -fsSL https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.sh | bash
 #  Or locally:
 #    bash install.sh
 # ─────────────────────────────────────────────────────────────────────────────
@@ -98,7 +98,7 @@ if [ "$PLATFORM" = "windows-bash" ]; then
     echo -e "  ${Y}⚠  Detected Windows (Git Bash / MSYS2)${NC}"
     echo -e "  ${D}For a native Windows experience, use PowerShell instead:${NC}"
     echo ""
-    echo -e "  ${W}  irm https://raw.githubusercontent.com/graphclaw/graphclaw/main/install.ps1 | iex${NC}"
+    echo -e "  ${W}  irm https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.ps1 | iex${NC}"
     echo ""
     echo -e "  Continuing with bash installer...\n"
 fi
@@ -156,7 +156,7 @@ if [ -z "$SCRIPT_DIR" ] || [ "$SCRIPT_DIR" = "/dev/fd" ] || [ ! -f "$SCRIPT_DIR/
     info "Running from pipe — cloning graphclaw..."
 
     if command -v git &>/dev/null; then
-        (git clone --depth 1 https://github.com/graphclaw/graphclaw "$CLONE_DIR" -q) &
+        (git clone --depth 1 https://github.com/zero-abd/graphclaw "$CLONE_DIR" -q) &
         spinner $! "Cloning repository"
         wait $!
         ok "Cloned to ${W}$CLONE_DIR${NC}"
@@ -368,7 +368,7 @@ cat > "$CONFIG_FILE" << EOF
     "secret_key": "$JWT_SECRET"
   },
   "skills": {
-    "registry_url": "https://raw.githubusercontent.com/graphclaw/skills-registry/main/index.json",
+    "registry_url": "https://clawhub.ai/api/v1",
     "installed_path": "$GRAPHCLAW_DIR/skills/installed"
   }
 }
