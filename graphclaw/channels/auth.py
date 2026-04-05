@@ -77,7 +77,7 @@ class ChannelAuthManager:
             )
         if self.group_policy == "allowlist" and not self._has_any_group_allowlist():
             warnings.append(
-                "group_policy='allowlist' with no groups configured; group messages will be blocked until you add "
+                "group_policy='allowlist' with no groups configured; this only blocks group chats — direct messages still work. Add "
                 f"channels.{self.channel}.groups (or channels.{self.channel}.guilds for Discord) or switch to 'open'"
             )
         return warnings
