@@ -13,8 +13,6 @@ R='\033[0;31m'   # red
 G='\033[0;32m'   # green
 Y='\033[1;33m'   # yellow
 C='\033[0;36m'   # cyan
-B='\033[0;34m'   # blue
-M='\033[0;35m'   # magenta
 W='\033[1;37m'   # white bold
 D='\033[2m'      # dim
 NC='\033[0m'     # reset
@@ -40,16 +38,35 @@ warn() { echo -e "  ${Y}⚠${NC}  $1"; }
 fail() { echo -e "  ${CROSS} $1"; exit 1; }
 info() { echo -e "  ${D}$1${NC}"; }
 
-ask() {
-    # ask <prompt> <default>
-    local prompt="$1" default="${2:-}"
-    if [ -n "$default" ]; then
-        echo -ne "  ${C}?${NC} ${BOLD}$prompt${NC} ${D}[${default}]${NC}: "
-    else
-        echo -ne "  ${C}?${NC} ${BOLD}$prompt${NC}: "
-    fi
+# ask_optional <prompt>  — returns whatever user types, empty is fine
+ask_optional() {
+    echo -ne "  ${C}?${NC} ${BOLD}$1${NC} ${D}(optional, Enter to skip)${NC}: "
     read -r REPLY
-    REPLY="${REPLY:-$default}"
+}
+
+# ask_required <prompt>  — loops until non-empty
+ask_required() {
+    while true; do
+        echo -ne "  ${C}?${NC} ${BOLD}$1${NC}: "
+        read -r REPLY
+        if [ -n "$REPLY" ]; then return; fi
+        echo -e "  ${R}  This field is required. Please enter a value.${NC}"
+    done
+}
+
+# ask_choice <prompt> <valid_values> <default>  — loops until valid
+# e.g. ask_choice "Select mode" "1 2" "1"
+ask_choice() {
+    local prompt="$1" valid="$2" default="$3"
+    while true; do
+        echo -ne "  ${C}?${NC} ${BOLD}$prompt${NC} ${D}[${default}]${NC}: "
+        read -r REPLY
+        REPLY="${REPLY:-$default}"
+        for v in $valid; do
+            if [ "$REPLY" = "$v" ]; then return; fi
+        done
+        echo -e "  ${R}  Invalid choice '${REPLY}'. Enter one of: ${valid}${NC}"
+    done
 }
 
 spinner() {
@@ -98,7 +115,7 @@ if [ "$PLATFORM" = "windows-bash" ]; then
     echo -e "  ${Y}⚠  Detected Windows (Git Bash / MSYS2)${NC}"
     echo -e "  ${D}For a native Windows experience, use PowerShell instead:${NC}"
     echo ""
-    echo -e "  ${W}  irm https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.ps1 | iex${NC}"
+    echo -e "  ${W}  .\\install.ps1${NC}"
     echo ""
     echo -e "  Continuing with bash installer...\n"
 fi
@@ -146,7 +163,6 @@ ok "Using ${W}$PY_VER${NC}"
 
 step "Locating source"
 
-# If piped via curl, BASH_SOURCE[0] will be /dev/stdin — need to clone
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
 INSTALL_FROM_PIPE=false
 
@@ -183,7 +199,6 @@ mkdir -p "$WORKSPACE_DIR/memory" \
 
 step "Installing dependencies"
 
-# Prefer uv if available (much faster)
 if command -v uv &>/dev/null; then
     info "Using uv for fast installation..."
     (uv pip install jaclang -q 2>/dev/null || true) &
@@ -206,7 +221,6 @@ else
     wait $!
 fi
 
-# Verify jac CLI
 if command -v jac &>/dev/null; then
     JAC_VER=$(jac --version 2>&1 | head -1 || echo "unknown")
     ok "jac CLI ready  ${D}($JAC_VER)${NC}"
@@ -226,13 +240,13 @@ echo ""
 echo -e "    ${W}1)${NC} ${BOLD}Single-user${NC}   ${D}— personal agent, no auth required${NC}"
 echo -e "    ${W}2)${NC} ${BOLD}Multi-user${NC}    ${D}— hosted platform, JWT auth, per-user memory graphs${NC}"
 echo ""
-ask "Select mode [1/2]" "1"
+ask_choice "Select mode [1/2]" "1 2" "1"
 MODE_CHOICE="$REPLY"
 
 if [ "$MODE_CHOICE" = "2" ]; then
     MULTI_USER=true
     ok "Multi-user mode selected"
-    ask "Secret key for JWT (leave blank to auto-generate)" ""
+    ask_optional "Secret key for JWT (blank to auto-generate)"
     JWT_SECRET="$REPLY"
     if [ -z "$JWT_SECRET" ]; then
         JWT_SECRET=$("$PYTHON" -c "import secrets; print(secrets.token_hex(32))")
@@ -258,7 +272,7 @@ echo -e "    ${W}3)${NC} ${BOLD}OpenAI${NC}       ${D}— GPT-4o / GPT-4.1${NC}"
 echo -e "    ${W}4)${NC} ${BOLD}Ollama${NC}       ${D}— local models, no API key needed${NC}"
 echo -e "    ${W}5)${NC} ${BOLD}Skip${NC}         ${D}— configure manually later${NC}"
 echo ""
-ask "Select provider [1-5]" "1"
+ask_choice "Select provider [1-5]" "1 2 3 4 5" "1"
 PROVIDER_CHOICE="$REPLY"
 
 OPENROUTER_KEY=""; ANTHROPIC_KEY=""; OPENAI_KEY=""
@@ -267,19 +281,19 @@ PROVIDER_NAME="OpenRouter"
 
 case "$PROVIDER_CHOICE" in
     1)
-        ask "OpenRouter API key" ""
+        ask_required "OpenRouter API key"
         OPENROUTER_KEY="$REPLY"
         ok "OpenRouter configured"
         ;;
     2)
-        ask "Anthropic API key" ""
+        ask_required "Anthropic API key"
         ANTHROPIC_KEY="$REPLY"
         DEFAULT_MODEL="anthropic/claude-sonnet-4-6"
         PROVIDER_NAME="Anthropic"
         ok "Anthropic configured"
         ;;
     3)
-        ask "OpenAI API key" ""
+        ask_required "OpenAI API key"
         OPENAI_KEY="$REPLY"
         DEFAULT_MODEL="openai/gpt-4o"
         PROVIDER_NAME="OpenAI"
@@ -299,21 +313,25 @@ esac
 echo ""
 echo -e "  ${D}Messaging channels — press Enter to skip any:${NC}"
 echo ""
-ask "Telegram bot token" ""
+ask_optional "Telegram bot token"
 TG_TOKEN="$REPLY"
-ask "Discord bot token " ""
+ask_optional "Discord bot token"
 DC_TOKEN="$REPLY"
-ask "Slack bot token   " ""
+ask_optional "Slack bot token"
 SL_BOT_TOKEN="$REPLY"
-ask "Slack app token   " ""
-SL_APP_TOKEN="$REPLY"
+if [ -n "$SL_BOT_TOKEN" ]; then
+    ask_required "Slack app token (required when bot token is set)"
+    SL_APP_TOKEN="$REPLY"
+else
+    SL_APP_TOKEN=""
+fi
 
 echo ""
 echo -e "  ${D}DevOps skill API keys — press Enter to skip:${NC}"
 echo ""
-ask "Base44 API key  " ""
+ask_optional "Base44 API key"
 BASE44_KEY="$REPLY"
-ask "Loveable API key" ""
+ask_optional "Loveable API key"
 LOVEABLE_KEY="$REPLY"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -322,7 +340,6 @@ LOVEABLE_KEY="$REPLY"
 
 step "Writing config & shell integration"
 
-# config.json
 cat > "$CONFIG_FILE" << EOF
 {
   "workspace": "$WORKSPACE_DIR",
@@ -375,7 +392,6 @@ cat > "$CONFIG_FILE" << EOF
 EOF
 ok "Config written to ${W}$CONFIG_FILE${NC}"
 
-# .env
 ENV_FILE="$GRAPHCLAW_DIR/.env"
 {
     echo "# Graphclaw environment — loaded at startup"
@@ -388,7 +404,6 @@ ENV_FILE="$GRAPHCLAW_DIR/.env"
 } > "$ENV_FILE"
 ok ".env written to ${W}$ENV_FILE${NC}"
 
-# run.sh
 cat > "$GRAPHCLAW_DIR/run.sh" << EOF
 #!/usr/bin/env bash
 set -a
@@ -399,7 +414,6 @@ EOF
 chmod +x "$GRAPHCLAW_DIR/run.sh"
 ok "Startup script: ${W}~/.graphclaw/run.sh${NC}"
 
-# Shell alias
 SHELL_RC=""
 if   [ -f "$HOME/.zshrc"  ]; then SHELL_RC="$HOME/.zshrc"
 elif [ -f "$HOME/.bashrc" ]; then SHELL_RC="$HOME/.bashrc"
@@ -415,7 +429,6 @@ if [ -n "$SHELL_RC" ]; then
     fi
 fi
 
-# Fish shell
 FISH_RC="$HOME/.config/fish/config.fish"
 if [ -f "$FISH_RC" ]; then
     if ! grep -q "alias graphclaw" "$FISH_RC" 2>/dev/null; then
