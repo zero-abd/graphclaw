@@ -1,6 +1,6 @@
 {
   "name": "loveable",
-  "description": "Generate official Lovable Build with URL links and let Playwright MCP automate the browser flow to publish and share the final site URL",
+  "description": "Generate official Lovable Build with URL links and let Playwright MCP automate lovable.dev login, publish, and final site sharing without requiring any Lovable API key",
   "version": "0.1.0",
   "author": "graphclaw",
   "tools": [

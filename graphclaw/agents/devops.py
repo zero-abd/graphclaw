@@ -86,7 +86,8 @@ class DevOpsAgent(BaseAgent):
         "do not rely on raw search_clawhub results alone for that approval flow. "
         "Use Lovable plus Playwright MCP when the user wants a real published website link, and use Base44's official MCP server when they want AI-driven Base44 app creation. "
         "If platform MCP servers are missing, configure them first with configure_platform_mcp_servers. "
-        "If the user gives Loveable login credentials, save them with the credential tool before attempting browser-driven publish or progress updates.\n"
+        "If the user gives Loveable login credentials, save them with the credential tool before attempting browser-driven publish or progress updates. "
+        "Do not ask for a Loveable API key; the Lovable flow should use lovable.dev login email and password only.\n"
         "Always verify before making destructive changes."
     )
 
