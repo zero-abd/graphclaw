@@ -137,3 +137,29 @@ def test_renaming_assistant_updates_seeded_graph_nodes(monkeypatch, tmp_path):
     labels = {node.label for node in memory.nodes}
     assert 'Jet Black Cat root node' in labels
     assert 'Name: Jet Black Cat' in labels
+
+
+def test_identity_and_soul_updates_refresh_seeded_graph(monkeypatch, tmp_path):
+    config_path = _write_config(tmp_path)
+    monkeypatch.setenv('GRAPHCLAW_CONFIG_PATH', str(config_path))
+    monkeypatch.setenv('GRAPHCLAW_HOME', str(tmp_path / '.graphclaw-home'))
+
+    importlib.reload(loader_mod)
+    backend = importlib.reload(backend_mod)
+    dashboard = importlib.reload(dashboard_mod)
+
+    updates = backend.extract_profile_updates(
+        'your identity is a razor-sharp bounty hunter and your soul is cool, dry, and funny'
+    )
+
+    assert updates['identity'] == 'a razor-sharp bounty hunter'
+    assert updates['soul'] == 'cool, dry, and funny'
+    profile = backend.get_profile()
+    assert 'razor-sharp bounty hunter' in profile['identity']
+    assert 'cool, dry, and funny' in profile['soul']
+
+    memories = backend._load_memories()
+    identity_node = next(memory for memory in memories if memory.get('system_key') == 'assistant_identity')
+    soul_node = next(memory for memory in memories if memory.get('system_key') == 'assistant_soul')
+    assert 'razor-sharp bounty hunter' in identity_node['content']
+    assert 'cool, dry, and funny' in soul_node['content']

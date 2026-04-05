@@ -22,6 +22,7 @@ def dispatch_message(msg: InboundMessage) {
         append_turn,
         consolidate_session,
         extract_assistant_name_change,
+        extract_profile_updates,
         get_assistant_name,
         get_memory_context,
         start_session,
@@ -106,6 +107,15 @@ def dispatch_message(msg: InboundMessage) {
             renamed_to = extract_assistant_name_change(msg.text)
             if renamed_to:
                 content = f"Got it — I'll go by {renamed_to} from now on."
+                append_turn(session_id=session_id, role="assistant", content=content)
+                consolidate_session(session_id)
+                bus.publish_outbound(OutboundMessage(channel=msg.channel, chat_id=msg.chat_id, text=content))
+                return
+
+            profile_updates = extract_profile_updates(msg.text)
+            if profile_updates:
+                changed = ", ".join(sorted(profile_updates.keys()))
+                content = f"Got it — I updated my {changed}."
                 append_turn(session_id=session_id, role="assistant", content=content)
                 consolidate_session(session_id)
                 bus.publish_outbound(OutboundMessage(channel=msg.channel, chat_id=msg.chat_id, text=content))
