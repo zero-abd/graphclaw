@@ -97,12 +97,35 @@ def _tracked_upstream() -> str:
     return "origin/main"
 
 
+def _format_dirty_repo_message(status_output: str) -> str:
+    lines = [line for line in status_output.splitlines() if line.strip()]
+    preview = []
+    for raw in lines[:5]:
+        if len(raw) > 120:
+            raw = raw[:117] + "..."
+        preview.append(f"  - {raw}")
+    more = ""
+    if len(lines) > 5:
+        more = f"\n  ... and {len(lines) - 5} more change(s)"
+
+    repo_path = source_dir()
+    return (
+        "Managed source has local changes, so Graphclaw will not auto-update over them.\n"
+        f"Managed source: {repo_path}\n"
+        + ("Changed files:\n" + "\n".join(preview) + more + "\n" if preview else "")
+        + "To continue safely:\n"
+        + f"  1. Inspect changes: cd {repo_path} && git status\n"
+        + f"  2. If you want the installed code to match main, discard them: cd {repo_path} && git reset --hard origin/main\n"
+        + "  3. Start Graphclaw again, or run `graphclaw update` once the repo is clean."
+    )
+
+
 def _ensure_clean_repo() -> None:
     result = _git(["status", "--porcelain"], check=False)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or "Unable to inspect git status")
     if result.stdout.strip():
-        raise RuntimeError("Managed source has local changes; aborting update to avoid overwriting them")
+        raise RuntimeError(_format_dirty_repo_message(result.stdout))
 
 
 def get_update_status(fetch: bool = True) -> dict[str, Any]:
