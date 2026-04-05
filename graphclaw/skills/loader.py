@@ -1,9 +1,12 @@
 """Skill loader — discovers local skills, recommends them, and integrates with ClawHub."""
 from __future__ import annotations
 import asyncio
+import io
 import inspect
 import json
 import re
+import shutil
+import zipfile
 from pathlib import Path
 from typing import Any, Dict, List
 from graphclaw.config.loader import load_config
@@ -185,6 +188,18 @@ def _task_terms(text: str) -> set[str]:
     }
 
 
+def _candidate_keyword_overlap(task: str, candidate: dict[str, Any]) -> int:
+    terms = _task_terms(task)
+    haystack = " ".join([
+        str(candidate.get("slug", "")),
+        str(candidate.get("name", "")),
+        str(candidate.get("description", "")),
+        " ".join(candidate.get("tags", []) or []),
+        str(candidate.get("preview", "")),
+    ]).lower()
+    return sum(1 for term in terms if term in haystack)
+
+
 def _skill_candidate_catalog() -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     lock = _read_lock().get("skills", {})
@@ -270,7 +285,7 @@ def _prefilter_candidates(task: str, candidates: list[dict[str, Any]], *, max_ca
             " ".join(candidate.get("tags", []) or []),
             str(candidate.get("preview", "")),
         ]).lower()
-        score = sum(1 for term in terms if term in haystack)
+        score = _candidate_keyword_overlap(task, candidate)
         if task and task.lower() in haystack:
             score += 2
         scored.append((score, candidate))
@@ -288,19 +303,16 @@ def _fallback_recommendations(task: str, candidates: list[dict[str, Any]], limit
             "name": candidate.get("name", candidate.get("slug", "")),
             "description": candidate.get("description", ""),
             "source": candidate.get("source", "local"),
+            "keyword_overlap": _candidate_keyword_overlap(task, candidate),
             "confidence": max(0.2, 0.6 - ((idx - 1) * 0.1)),
             "reason": "Closest installed skill match from local metadata.",
         })
     return results
 
 
-def recommend_skills(task: str, limit: int = 3) -> list[dict[str, Any]]:
+def _recommend_from_candidates(task: str, candidates: list[dict[str, Any]], limit: int = 3) -> list[dict[str, Any]]:
     task = str(task or "").strip()
-    if not task:
-        return []
-
-    candidates = _skill_candidate_catalog()
-    if not candidates:
+    if not task or not candidates:
         return []
 
     shortlisted = _prefilter_candidates(task, candidates)
@@ -356,6 +368,7 @@ def recommend_skills(task: str, limit: int = 3) -> list[dict[str, Any]]:
                 "name": candidate.get("name", slug),
                 "description": candidate.get("description", ""),
                 "source": candidate.get("source", "local"),
+                "keyword_overlap": _candidate_keyword_overlap(task, candidate),
                 "confidence": confidence,
                 "reason": str(raw_reason or "").strip(),
             })
@@ -368,6 +381,10 @@ def recommend_skills(task: str, limit: int = 3) -> list[dict[str, Any]]:
 
     _SKILL_RECOMMENDATION_CACHE[cache_key] = recommendations[:limit]
     return recommendations[:limit]
+
+
+def recommend_skills(task: str, limit: int = 3) -> list[dict[str, Any]]:
+    return _recommend_from_candidates(task, _skill_candidate_catalog(), limit=limit)
 
 
 def build_recommended_skills_summary(task: str, limit: int = 3) -> str:
@@ -385,17 +402,47 @@ def build_recommended_skills_summary(task: str, limit: int = 3) -> str:
 async def search_clawhub(query: str) -> List[Dict[str, Any]]:
     """Search ClawHub API for skills."""
     try:
-        import aiohttp
+        import httpx
         url = f"{CLAWHUB_BASE}/api/v1/search"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params={"q": query}, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                if resp.status == 200:
-                    return await resp.json()
-                return [{"error": f"ClawHub returned {resp.status}"}]
-    except ImportError:
-        return [{"error": "aiohttp not installed"}]
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, params={"q": query})
+            if resp.status_code != 200:
+                return [{"error": f"ClawHub returned {resp.status_code}"}]
+            payload = resp.json()
+            if isinstance(payload, dict) and isinstance(payload.get("results"), list):
+                return payload["results"]
+            if isinstance(payload, list):
+                return payload
+            return [{"error": "Unexpected ClawHub response format"}]
     except Exception as e:
         return [{"error": str(e)}]
+
+
+def search_installable_skills_from_results(task: str, results: list[dict[str, Any]], limit: int = 3) -> list[dict[str, Any]]:
+    candidates: list[dict[str, Any]] = []
+    for item in results:
+        slug = str(item.get("slug", "") or "").strip()
+        if not slug:
+            continue
+        candidates.append({
+            "slug": slug,
+            "name": str(item.get("displayName", slug) or slug),
+            "description": str(item.get("summary", "") or ""),
+            "path": "",
+            "type": "skill",
+            "source": "clawhub",
+            "tags": [slug.replace("-", " ")],
+            "preview": str(item.get("summary", "") or ""),
+            "search_score": item.get("score", 0.0),
+        })
+    return _recommend_from_candidates(task, candidates, limit=limit)
+
+
+async def search_installable_skills(task: str, limit: int = 3) -> list[dict[str, Any]]:
+    results = await search_clawhub(task)
+    if results and isinstance(results[0], dict) and results[0].get("error"):
+        return results
+    return search_installable_skills_from_results(task, results, limit=limit)
 
 
 async def install_skill(source: str) -> str:
@@ -425,27 +472,39 @@ async def install_skill(source: str) -> str:
         if target.exists():
             return f"Skill '{slug}' already installed at {target}"
         try:
-            import aiohttp
+            import httpx
             url = f"{CLAWHUB_BASE}/api/v1/download"
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, params={"slug": slug}, timeout=aiohttp.ClientTimeout(total=30)) as resp:
-                    if resp.status != 200:
-                        return f"ClawHub download failed: HTTP {resp.status}"
-                    data = await resp.json()
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.get(url, params={"slug": slug})
+            if resp.status_code != 200:
+                return f"ClawHub download failed: HTTP {resp.status_code}"
 
             target.mkdir(parents=True, exist_ok=True)
-            # Write SKILL.md
-            if "content" in data:
-                (target / "SKILL.md").write_text(data["content"], encoding="utf-8")
-            # Write metadata
-            if "metadata" in data:
-                (target / "skill.json").write_text(
-                    json.dumps(data["metadata"], indent=2), encoding="utf-8"
-                )
-            _update_lock(slug, source="clawhub", version=str(data.get("version", "latest")), skill_type="skill")
+            version = "latest"
+            content_type = resp.headers.get("content-type", "")
+            if "application/json" in content_type:
+                data = resp.json()
+                if "content" in data:
+                    (target / "SKILL.md").write_text(data["content"], encoding="utf-8")
+                if "metadata" in data:
+                    (target / "skill.json").write_text(
+                        json.dumps(data["metadata"], indent=2), encoding="utf-8"
+                    )
+                version = str(data.get("version", "latest"))
+            else:
+                with zipfile.ZipFile(io.BytesIO(resp.content)) as archive:
+                    archive.extractall(target)
+                skill_md = target / "SKILL.md"
+                if not skill_md.exists():
+                    nested = [path.parent for path in target.rglob("SKILL.md")]
+                    if len(nested) == 1:
+                        nested_dir = nested[0]
+                        for item in nested_dir.iterdir():
+                            shutil.move(str(item), target / item.name)
+                        shutil.rmtree(nested_dir, ignore_errors=True)
+
+            _update_lock(slug, source="clawhub", version=version, skill_type="skill")
             return f"Installed '{slug}' from ClawHub to {target}. Start a new session to load it."
-        except ImportError:
-            return "Error: aiohttp not installed"
         except Exception as e:
             return f"Error installing skill: {e}"
 
