@@ -11,7 +11,9 @@ from typing import Any, Dict, Iterable, Optional
 from graphclaw.config.loader import load_config
 
 
-PAIRING_CODE_LENGTH = 6
+PAIRING_CODE_LENGTH = 8
+PAIRING_TTL_SECONDS = 3600
+MAX_PENDING_REQUESTS = 3
 _PAIRING_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
@@ -134,19 +136,31 @@ class ChannelAuthManager:
                 ]
             )
 
-        request = self._get_or_create_pairing_request(event)
+        pairing = self._get_or_create_pairing_request(event)
+        if pairing is None:
+            return AuthDecision(
+                responses=[
+                    f"There are already {MAX_PENDING_REQUESTS} pending {self.channel.title()} pairing requests. "
+                    "Ask the owner to approve or wait for older requests to expire before trying again."
+                ],
+                metadata={"auth_status": "pending_limit_reached"},
+            )
+        request, was_created = pairing
         owner_hint = (
             f"The owner can approve it by sending 'pairing approve {request['code']}' "
-            f"from an allowed {self.channel.title()} account."
+            f"from an allowed {self.channel.title()} account or from the local CLI."
         )
         if not self.owner_ids:
             owner_hint += f" No owner_ids are configured yet; set channels.{self.channel}.owner_ids first."
+        status_line = "Owner approval is required before we can chat here."
+        if not was_created:
+            status_line = "Your earlier pairing request is still pending approval."
         return AuthDecision(
             responses=[
-                "Owner approval is required before we can chat here.",
+                status_line,
                 f"Pairing code: {request['code']}",
                 owner_hint,
-                f"Owners can inspect pending requests with 'pairing list' on {self.channel.title()}.",
+                f"Owners can inspect pending requests with 'pairing list {self.channel}'.",
             ],
             metadata={"auth_status": "pending", "pairing_code": request["code"]},
         )
@@ -252,7 +266,7 @@ class ChannelAuthManager:
         lines.append("Approve with: pairing approve <code>")
         return "\n".join(lines)
 
-    def _get_or_create_pairing_request(self, event: AuthEvent) -> dict[str, Any]:
+    def _get_or_create_pairing_request(self, event: AuthEvent) -> tuple[dict[str, Any], bool] | None:
         pending = self._read_pairings()
         existing_code = next(
             (
@@ -264,19 +278,21 @@ class ChannelAuthManager:
         )
         if existing_code:
             request = pending[existing_code]
-        else:
-            request = {
-                "code": self._generate_code(),
-                "user_id": event.user_id,
-                "chat_id": event.chat_id,
-                "username": event.username,
-                "display_name": event.display_name,
-                "created_at": datetime.now(UTC).isoformat(),
-                "last_text": event.text[:500],
-            }
-            pending[request["code"]] = request
-            self._write_pairings(pending)
-        return request
+            return request, False
+        if len(pending) >= MAX_PENDING_REQUESTS:
+            return None
+        request = {
+            "code": self._generate_code(),
+            "user_id": event.user_id,
+            "chat_id": event.chat_id,
+            "username": event.username,
+            "display_name": event.display_name,
+            "created_at": datetime.now(UTC).isoformat(),
+            "last_text": event.text[:500],
+        }
+        pending[request["code"]] = request
+        self._write_pairings(pending)
+        return request, True
 
     def _generate_code(self) -> str:
         pending = self._read_pairings()
@@ -387,8 +403,26 @@ class ChannelAuthManager:
 
     def _read_pairings(self) -> dict[str, dict[str, Any]]:
         payload = self._read_json(self.pairing_path, {"pending": {}})
-        pending = payload.get("pending", {}) or {}
-        return {self._normalize_code(code): dict(request) for code, request in pending.items()}
+        pending = {self._normalize_code(code): dict(request) for code, request in (payload.get("pending", {}) or {}).items()}
+        now = datetime.now(UTC)
+        filtered = {}
+        expired = False
+        for code, request in pending.items():
+            created_at = str(request.get("created_at", ""))
+            try:
+                created = datetime.fromisoformat(created_at)
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=UTC)
+            except ValueError:
+                created = now
+            age_seconds = (now - created).total_seconds()
+            if age_seconds > PAIRING_TTL_SECONDS:
+                expired = True
+                continue
+            filtered[code] = request
+        if expired:
+            self._write_pairings(filtered)
+        return filtered
 
     def _write_pairings(self, pending: dict[str, dict[str, Any]]) -> None:
         payload = {"pending": pending}
@@ -416,3 +450,13 @@ class ChannelAuthManager:
 
     def _normalize_code(self, value: Any) -> str:
         return "".join(ch for ch in str(value).upper() if ch.isalnum())
+
+
+def list_pending_requests(channel: str) -> str:
+    manager = ChannelAuthManager(channel)
+    return manager._render_pending_requests()
+
+
+def approve_pairing_request(channel: str, code: str) -> AuthDecision:
+    manager = ChannelAuthManager(channel)
+    return manager._approve_pairing(code)

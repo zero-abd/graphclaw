@@ -17,6 +17,7 @@ def dispatch_message(msg: InboundMessage) {
     import traceback
 
     from graphclaw.agents.coordinator_runtime import run_coordinator
+    from graphclaw.channels.auth import approve_pairing_request, list_pending_requests
     from graphclaw.memory.backend import (
         append_turn,
         consolidate_session,
@@ -35,6 +36,24 @@ def dispatch_message(msg: InboundMessage) {
             return result.get("content", str(result))
         return str(result)
 
+    def _maybe_handle_local_pairing_command(raw_text: str) -> str | None:
+        normalized = raw_text.strip().lstrip('/')
+        parts = normalized.split()
+        if len(parts) < 3 or parts[0].lower() != "pairing":
+            return None
+        action = parts[1].lower()
+        channel = parts[2].lower()
+        if action == "list":
+            return list_pending_requests(channel)
+        if action == "approve" and len(parts) >= 4:
+            decision = approve_pairing_request(channel, parts[3])
+            for notification in decision.notifications:
+                bus.publish_outbound(OutboundMessage(channel=channel, chat_id=notification.chat_id, text=notification.text))
+            if decision.responses:
+                return "\n".join(decision.responses)
+            return f"Processed pairing approval for {channel}."
+        return "Usage: pairing list <channel> | pairing approve <channel> <code>"
+
     async def _handle():
         session_id = ""
         try:
@@ -45,6 +64,15 @@ def dispatch_message(msg: InboundMessage) {
                 agent="coordinator",
             )
             append_turn(session_id=session_id, role="user", content=msg.text)
+
+            local_pairing_response = None
+            if msg.channel == "cli":
+                local_pairing_response = _maybe_handle_local_pairing_command(msg.text)
+            if local_pairing_response is not None:
+                append_turn(session_id=session_id, role="assistant", content=local_pairing_response)
+                consolidate_session(session_id)
+                bus.publish_outbound(OutboundMessage(channel=msg.channel, chat_id=msg.chat_id, text=local_pairing_response))
+                return
 
             assistant_name = get_assistant_name()
             renamed_to = extract_assistant_name_change(msg.text)
