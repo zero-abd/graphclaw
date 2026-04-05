@@ -295,16 +295,17 @@ Example config:
 }
 ```
 
-Owner approval commands:
+Local approval commands:
 
-- `pairing list`
-- `pairing approve <code>`
+- `pairing list telegram`
+- `pairing approve telegram <code>`
 
 Troubleshooting:
 
-- If DMs keep returning pairing codes, run `pairing list` from an owner account and approve the pending code.
+- First-time Telegram onboarding: open `https://t.me/<your_bot_username>`, press **Start**, then send any message.
+- If DMs return a pairing code, run `pairing list telegram` and `pairing approve telegram <code>` in the local Graphclaw terminal.
 - If group messages are ignored, add the group/channel to `groups` / `guilds`, or set `group_policy` to `"open"`.
-- If approvals cannot happen, set `channels.<provider>.owner_ids` (or `allow_from`) so an owner can issue `pairing approve <code>`.
+- If you also want in-chat approvals, set `channels.<provider>.owner_ids` (or `allow_from`) so an owner can issue `pairing approve <code>` from that channel.
 
 ---
 

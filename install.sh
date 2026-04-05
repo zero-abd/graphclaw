@@ -315,7 +315,30 @@ echo ""
 ask_choice "Select first chat interface [1-4]" "1 2 3 4" "1"
 CHANNEL_CHOICE="$REPLY"
 
-TG_TOKEN=""; DC_TOKEN=""; SL_BOT_TOKEN=""; SL_APP_TOKEN=""
+TG_TOKEN=""; TG_USERNAME=""; DC_TOKEN=""; SL_BOT_TOKEN=""; SL_APP_TOKEN=""
+
+resolve_telegram_bot_username() {
+    local token="$1"
+    [ -z "$token" ] && return 0
+    "$PYTHON" - "$token" <<'PY'
+import json
+import sys
+import urllib.request
+
+token = (sys.argv[1] if len(sys.argv) > 1 else "").strip()
+if not token:
+    raise SystemExit(0)
+try:
+    with urllib.request.urlopen(f"https://api.telegram.org/bot{token}/getMe", timeout=10) as resp:
+        payload = json.load(resp)
+except Exception:
+    raise SystemExit(0)
+result = payload.get("result") or {}
+username = str(result.get("username") or "").strip().lstrip("@")
+if username:
+    print(username)
+PY
+}
 
 configure_telegram() {
     echo ""
@@ -328,7 +351,19 @@ configure_telegram() {
     hint "5. Start a chat with your bot so it can message you back"
     ask_optional "Paste Telegram bot token"
     TG_TOKEN="$REPLY"
-    if [ -n "$TG_TOKEN" ]; then ok "Telegram configured"; fi
+    if [ -n "$TG_TOKEN" ]; then
+        ok "Telegram configured"
+        TG_USERNAME="$(resolve_telegram_bot_username "$TG_TOKEN")"
+        if [ -n "$TG_USERNAME" ]; then
+            hint "Client onboarding link: https://t.me/$TG_USERNAME"
+            hint "Tell the client to open that link, press Start, then send any message."
+        else
+            hint "Next step: open your bot in Telegram, press Start, then send any message."
+        fi
+        hint "If Telegram replies with a pairing code, approve it locally with:"
+        hint "  pairing list telegram"
+        hint "  pairing approve telegram <code>"
+    fi
 }
 
 configure_discord() {
@@ -642,3 +677,12 @@ echo -e "  ${D}Later, manage updates safely with:${NC}"
 echo -e "       ${W}graphclaw update${NC}"
 echo -e "       ${W}graphclaw rollback${NC}"
 echo ""
+if [ -n "$TG_USERNAME" ]; then
+    echo -e "  ${BOLD}${W}Send this to your client${NC}"
+    echo -e "  ${D}──────────────────────────────────────────${NC}"
+    echo -e "  ${W}Open https://t.me/$TG_USERNAME, press Start, then send me any message.${NC}"
+    echo -e "  ${D}If Telegram replies with a pairing code, approve it in this terminal with:${NC}"
+    echo -e "       ${W}pairing list telegram${NC}"
+    echo -e "       ${W}pairing approve telegram <code>${NC}"
+    echo ""
+fi

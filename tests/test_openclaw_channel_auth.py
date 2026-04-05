@@ -95,6 +95,13 @@ class FakeTelegramApplicationBuilder:
         return self.app
 
 
+class FakeLogger:
+    def __init__(self):
+        self.levels = []
+
+    def setLevel(self, level):
+        self.levels.append(level)
+
 class FakeDiscordSelfUser:
     def __init__(self, user_id="self-user"):
         self.id = user_id
@@ -321,6 +328,7 @@ def test_startup_warnings_point_to_local_cli_when_no_owner_ids(monkeypatch, tmp_
     warnings = manager.startup_warnings()
 
     assert any("pairing approve telegram <code>" in warning for warning in warnings)
+    assert any("direct messages still work" in warning for warning in warnings)
     assert not any("No owner_ids are configured yet" in warning for warning in warnings)
     assert not any("owner_ids (or allow_from)" in warning for warning in warnings)
 
@@ -388,6 +396,44 @@ def test_telegram_pairing_policy_prompts_unknown_sender_before_dispatch(monkeypa
     assert fake_bus.inbound == []
     assert fake_app.bot.sent_messages
     assert any("Pairing code:" in item["text"] for item in fake_app.bot.sent_messages)
+
+
+def test_telegram_startup_prints_first_use_instructions_and_quiets_noisy_logs(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    cfg = SimpleNamespace(
+        channels={
+            "telegram": {
+                "bot_token": "token",
+                "allow_from": [],
+                "dm_policy": "pairing",
+                "owner_ids": [],
+            }
+        }
+    )
+    fake_bus, fake_app = _install_fake_telegram(monkeypatch, cfg)
+    fake_loggers = {}
+    real_get_logger = telegram_mod.logging.getLogger
+
+    def fake_get_logger(name=None):
+        if name not in {"httpx", "httpcore", "telegram", "telegram.ext"}:
+            return real_get_logger(name)
+        logger = fake_loggers.get(name)
+        if logger is None:
+            logger = FakeLogger()
+            fake_loggers[name] = logger
+        return logger
+
+    monkeypatch.setattr(telegram_mod.logging, "getLogger", fake_get_logger)
+
+    assert asyncio.run(telegram_mod.start_telegram_channel()) is True
+
+    out = capsys.readouterr().out
+    assert fake_bus.inbound == []
+    assert "https://t.me/graphclawbot" in out
+    assert "press Start in Telegram, then send any message" in out
+    assert "pairing approve telegram <code>" in out
+    for logger_name in ("httpx", "httpcore", "telegram", "telegram.ext"):
+        assert fake_loggers[logger_name].levels[-1] == telegram_mod.logging.WARNING
 
 
 def test_discord_ignores_self_messages(monkeypatch, tmp_path):
