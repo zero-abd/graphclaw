@@ -155,12 +155,22 @@ with entry {
     import asyncio
     import sys
 
+    from graphclaw.dashboard_runtime import ensure_local_dashboard
     from graphclaw.setup_runtime import maybe_prompt_for_provider_key
     from graphclaw.update_manager import maybe_prompt_for_update
 
     cfg = load_config()
     ensure_workspace()
     print(f"[graphclaw] starting -- workspace: {cfg.workspace}")
+
+    dashboard_url = None
+    if sys.stdin and sys.stdin.isatty():
+        try:
+            dashboard_url = ensure_local_dashboard(open_browser=True)
+            if dashboard_url:
+                print(f"[graphclaw] dashboard: {dashboard_url}")
+        except Exception as exc:
+            print(f"[graphclaw] dashboard startup warning: {exc}")
 
     channels_started = []
     channel_failures = []
