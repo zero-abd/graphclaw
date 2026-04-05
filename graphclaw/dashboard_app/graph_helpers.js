@@ -90,11 +90,12 @@ export function GraphMemoryCanvas({ memory }) {
     linkDirectionalArrowLength: 6,
     linkDirectionalArrowRelPos: 1,
     linkCurvature: 0.1,
-    d3VelocityDecay: 0.16,
+    d3AlphaDecay: 0.02,
+    d3VelocityDecay: 0.12,
     width: 960,
     height: 460,
     enableNodeDrag: true,
-    cooldownTicks: 0,
-    warmupTicks: 0,
+    cooldownTicks: 160,
+    warmupTicks: 80,
   });
 }
