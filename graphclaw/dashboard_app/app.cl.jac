@@ -1,5 +1,5 @@
 import "./dashboard.css";
-cl import from "react-force-graph-2d" { default as ForceGraph2D }
+cl import from "./graph_helpers.js" { GraphMemoryCanvas }
 sv import from graphclaw.dashboard { dashboard_memory, dashboard_overview, OverviewResponse, MemoryResponse }
 
 
@@ -204,54 +204,14 @@ def SkillsContent(overview: OverviewResponse) -> JsxElement {
 
 
 def GraphView(memory: MemoryResponse) -> JsxElement {
-    graph_nodes = [
-        {
-            "id": node.id,
-            "label": node.label,
-            "group": node.system_key != "" and "core" or node.kind,
-            "color": node.system_key == "assistant_root" and "#38bdf8" or node.system_key != "" and "#8b5cf6" or node.kind == "session" and "#22c55e" or node.kind == "turn" and "#f59e0b" or "#14b8a6",
-            "val": node.system_key == "assistant_root" and 12 or node.system_key != "" and 8 or node.kind == "session" and 6 or 5,
-        }
-        for node in memory.nodes[:60]
-    ];
-    graph_links = [
-        {
-            "source": edge.source,
-            "target": edge.target,
-            "label": edge.label,
-            "color": edge.source == memory.nodes[0].id and "rgba(56, 189, 248, 0.95)" or "rgba(125, 211, 252, 0.72)",
-            "particles": edge.source == memory.nodes[0].id and 3 or 1,
-        }
-        for edge in memory.edges[:120]
-    ];
-
     return <div className="graph-shell">
         <div className="graph-canvas">
-            <ForceGraph2D
-                graphData={{"nodes": graph_nodes, "links": graph_links}}
-                backgroundColor="rgba(2, 6, 23, 0)"
-                nodeLabel="label"
-                nodeVal="val"
-                nodeColor="color"
-                linkLabel="label"
-                linkColor="color"
-                linkWidth={4}
-                linkDirectionalParticles={4}
-                linkDirectionalParticleWidth={3.2}
-                linkDirectionalArrowLength={5}
-                linkDirectionalArrowRelPos={1}
-                linkCurvature={0.12}
-                cooldownTicks={200}
-                warmupTicks={80}
-                d3VelocityDecay={0.18}
-                width={960}
-                height={460}
-            />
+            <GraphMemoryCanvas initialData={memory}/>
         </div>
         <div className="graph-legend">
             <div className="list-item"><div className="list-item-title">Root node</div><div className="list-item-meta">Pinned assistant origin for the graph cluster</div></div>
-            <div className="list-item"><div className="list-item-title">Core identity</div><div className="list-item-meta">Name, identity, soul, dream cadence, and seeded system knowledge</div></div>
-            <div className="list-item"><div className="list-item-title">Conversation graph</div><div className="list-item-meta">Movable sessions, turns, and memory nodes linked like a living knowledge graph</div></div>
+            <div className="list-item"><div className="list-item-title">Core identity</div><div className="list-item-meta">Name, identity, soul, dream cadence, and other foundational nodes</div></div>
+            <div className="list-item"><div className="list-item-title">Conversation graph</div><div className="list-item-meta">Movable sessions, turns, and memory nodes connected through live relationships</div></div>
         </div>
     </div>;
 }
@@ -327,6 +287,7 @@ def:pub DashboardApp() -> JsxElement {
     async can with entry {
         await load_data();
     }
+
 
     overview_nav_class = "nav-link";
     sessions_nav_class = "nav-link";

@@ -156,6 +156,36 @@ def _ensure_core_memory_graph(workspace: Path) -> None:
         topics=["assistant", "dream", "maintenance"],
         relationship="runs_dream_cycle",
     )
+    skills_root_id = upsert_system_memory(
+        "assistant_skills_root",
+        "Skills root",
+        topics=["assistant", "skills"],
+        relationship="has_skills",
+    )
+    inherent_skills_id = upsert_system_memory(
+        "assistant_skills_inherent",
+        "Inherent skills",
+        topics=["assistant", "skills", "inherent"],
+        relationship="has_skill_group",
+    )
+    clawhub_skills_id = upsert_system_memory(
+        "assistant_skills_clawhub",
+        "ClawHub skills",
+        topics=["assistant", "skills", "clawhub"],
+        relationship="has_skill_group",
+    )
+    workspace_skills_id = upsert_system_memory(
+        "assistant_skills_workspace",
+        "Workspace skills",
+        topics=["assistant", "skills", "workspace"],
+        relationship="has_skill_group",
+    )
+    shared_skills_id = upsert_system_memory(
+        "assistant_skills_shared",
+        "Shared skills",
+        topics=["assistant", "skills", "shared"],
+        relationship="has_skill_group",
+    )
 
     root_node = next(
         (item for item in memories if str(item.get("system_key", "")) == "assistant_root"),
@@ -168,12 +198,64 @@ def _ensure_core_memory_graph(workspace: Path) -> None:
             {"to": identity_id, "relationship": "has_identity", "weight": 1.0},
             {"to": soul_id, "relationship": "has_soul", "weight": 1.0},
             {"to": dream_id, "relationship": "runs_dream_cycle", "weight": 1.0},
+            {"to": skills_root_id, "relationship": "has_skills", "weight": 1.0},
         ]
         for relation in desired_relationships:
             if relation not in relationships:
                 relationships.append(relation)
                 root_node["updated_at"] = now
                 memories_changed = True
+
+    skills_root_node = next(
+        (item for item in memories if str(item.get("system_key", "")) == "assistant_skills_root"),
+        None,
+    )
+    if skills_root_node is not None:
+        relationships = _ensure_memory_relationships(skills_root_node)
+        desired_relationships = [
+            {"to": inherent_skills_id, "relationship": "has_skill_group", "weight": 1.0},
+            {"to": clawhub_skills_id, "relationship": "has_skill_group", "weight": 1.0},
+            {"to": workspace_skills_id, "relationship": "has_skill_group", "weight": 1.0},
+            {"to": shared_skills_id, "relationship": "has_skill_group", "weight": 1.0},
+        ]
+        for relation in desired_relationships:
+            if relation not in relationships:
+                relationships.append(relation)
+                skills_root_node["updated_at"] = now
+                memories_changed = True
+
+    try:
+        from graphclaw.skills.loader import list_skills
+
+        skill_group_ids = {
+            "bundled": inherent_skills_id,
+            "local": workspace_skills_id,
+            "shared": shared_skills_id,
+            "clawhub": clawhub_skills_id,
+            "git": clawhub_skills_id,
+        }
+        for skill in list_skills():
+            slug = str(skill.get("slug", "")).strip()
+            if not slug:
+                continue
+            source = str(skill.get("source", "local")).strip() or "local"
+            group_id = skill_group_ids.get(source, workspace_skills_id)
+            skill_id = upsert_system_memory(
+                f"assistant_skill_{slug}",
+                f"Skill: {slug}",
+                topics=["assistant", "skills", source, str(skill.get("type", "skill"))],
+                relationship="has_skill",
+            )
+            group_node = next((item for item in memories if str(item.get("id")) == group_id), None)
+            if group_node is not None:
+                relationships = _ensure_memory_relationships(group_node)
+                relation = {"to": skill_id, "relationship": "has_skill", "weight": 1.0}
+                if relation not in relationships:
+                    relationships.append(relation)
+                    group_node["updated_at"] = now
+                    memories_changed = True
+    except Exception:
+        pass
 
     if profile.get("root_memory_id") != root_id:
         profile["root_memory_id"] = root_id

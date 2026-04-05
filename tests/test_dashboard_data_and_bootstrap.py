@@ -58,11 +58,23 @@ def test_bootstrap_creates_root_identity_memory(monkeypatch, tmp_path):
     assert profile['root_memory_id']
 
     system_keys = {memory.get('system_key') for memory in memories}
-    assert {'assistant_root', 'assistant_name', 'assistant_identity', 'assistant_soul', 'assistant_dream_cadence'} <= system_keys
+    assert {
+        'assistant_root',
+        'assistant_name',
+        'assistant_identity',
+        'assistant_soul',
+        'assistant_dream_cadence',
+        'assistant_skills_root',
+        'assistant_skills_inherent',
+        'assistant_skills_clawhub',
+        'assistant_skills_workspace',
+        'assistant_skills_shared',
+    } <= system_keys
+    assert any(str(key).startswith('assistant_skill_') for key in system_keys if key)
 
     root = next(memory for memory in memories if memory.get('system_key') == 'assistant_root')
     relationships = {item['relationship'] for item in root.get('relationships', [])}
-    assert {'has_name', 'has_identity', 'has_soul', 'runs_dream_cycle'} <= relationships
+    assert {'has_name', 'has_identity', 'has_soul', 'runs_dream_cycle', 'has_skills'} <= relationships
 
 
 def test_dashboard_overview_reports_skill_and_identity_state(monkeypatch, tmp_path):

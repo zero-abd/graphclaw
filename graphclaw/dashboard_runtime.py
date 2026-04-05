@@ -114,7 +114,12 @@ def _recent_log_excerpt() -> str:
 def _ensure_dashboard_client_sync() -> None:
     jac_toml = _dashboard_project_root() / "jac.toml"
     package_json = _dashboard_client_dir() / "configs" / "package.json"
+    helper_src = _dashboard_project_root() / "graph_helpers.js"
+    helper_dest = _dashboard_client_dir() / "compiled" / "graph_helpers.js"
     if not jac_toml.exists() or not package_json.exists():
+        if helper_src.exists():
+            helper_dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(helper_src, helper_dest)
         return
     try:
         jac_data = tomllib.loads(jac_toml.read_text(encoding="utf-8"))
@@ -126,6 +131,9 @@ def _ensure_dashboard_client_sync() -> None:
     actual = set((package_data.get("dependencies") or {}).keys())
     if expected - actual:
         shutil.rmtree(_dashboard_client_dir(), ignore_errors=True)
+    if helper_src.exists():
+        helper_dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(helper_src, helper_dest)
 
 
 def _read_state() -> dict[str, Any]:
