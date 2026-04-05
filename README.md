@@ -15,6 +15,48 @@ Inspired by **[nanobot](https://github.com/HKUDS/nanobot)** and **[openclaw](htt
 
 ---
 
+## Install
+
+**Requirements:**
+- **[Python 3.12+](https://docs.python.org/3.12/)**
+- **[Git](https://git-scm.com/)**
+
+**Linux / macOS / WSL:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.ps1 | iex
+```
+
+**Local clone:**
+```bash
+git clone https://github.com/zero-abd/graphclaw
+cd graphclaw
+bash install.sh
+```
+
+The installer configures:
+1. deployment mode
+2. default model provider
+3. first chat channel
+4. optional builder skill credentials
+
+Then launch:
+```bash
+graphclaw
+```
+
+Windows:
+```powershell
+graphclaw
+```
+
+
+---
+
 ## Positioning
 
 Graphclaw is not trying to pretend OpenClaw is "worse". The lineage and tradeoffs are different:
@@ -98,45 +140,6 @@ Graphclaw includes Playwright-backed browser helpers for:
 - automation support for builder/platform flows
 
 ---
-
-## Install
-
-**Requirements:**
-- **[Python 3.12+](https://docs.python.org/3.12/)**
-- **[Git](https://git-scm.com/)**
-
-**Linux / macOS / WSL:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.sh | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-irm https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.ps1 | iex
-```
-
-**Local clone:**
-```bash
-git clone https://github.com/zero-abd/graphclaw
-cd graphclaw
-bash install.sh
-```
-
-The installer configures:
-1. deployment mode
-2. default model provider
-3. first chat channel
-4. optional builder skill credentials
-
-Then launch:
-```bash
-graphclaw
-```
-
-Windows:
-```powershell
-graphclaw
-```
 
 ---
 
