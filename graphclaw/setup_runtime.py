@@ -61,6 +61,19 @@ def _write_env_key(provider: str, value: str) -> None:
     env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _env_var_examples(provider: str) -> tuple[str, str, str]:
+    key_name = {
+        "openrouter": "OPENROUTER_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY",
+        "openai": "OPENAI_API_KEY",
+    }[provider]
+    return (
+        key_name,
+        f"macOS / Linux: export {key_name}='your-key'",
+        f"Windows PowerShell: $env:{key_name}='your-key'",
+    )
+
+
 def maybe_prompt_for_provider_key(
     *,
     input_fn: Callable[[str], str] = input,
@@ -91,11 +104,17 @@ def maybe_prompt_for_provider_key(
         ),
     }
     label, url, _ = prompts[provider]
+    key_name, unix_example, ps_example = _env_var_examples(provider)
+    if provider == "openrouter":
+        print_fn("[graphclaw] OpenRouter is the provider here; you do not need a separate Anthropic key for the default Claude-via-OpenRouter model.")
     print_fn(f"[graphclaw] {label} API key is missing.")
     print_fn(f"[graphclaw] Get one here: {url}")
+    print_fn(f"[graphclaw] Or set {key_name} yourself later:")
+    print_fn(f"[graphclaw]   {unix_example}")
+    print_fn(f"[graphclaw]   {ps_example}")
     answer = input_fn(f"[graphclaw] Paste {label} API key now (or press Enter to skip): ").strip()
     if not answer:
-        return SetupPromptResult(action="skipped", provider=provider)
+        return SetupPromptResult(action="skipped", provider=provider, message=f"Set {key_name} later to enable {label}.")
 
     cfg = load_config(force_reload=True)
     cfg.providers.setdefault(provider, {})["api_key"] = answer
