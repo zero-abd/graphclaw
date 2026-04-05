@@ -1,5 +1,5 @@
 import "./dashboard.css";
-sv import from .dashboard { dashboard_memory, dashboard_overview, OverviewResponse, MemoryResponse }
+sv import from graphclaw.dashboard { dashboard_memory, dashboard_overview, OverviewResponse, MemoryResponse }
 
 
 def StatusPill(text: str, tone: str = "info") -> JsxElement {

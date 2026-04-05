@@ -122,7 +122,7 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
     env = dict(os.environ)
     env.setdefault("GRAPHCLAW_CONFIG_PATH", os.environ.get("GRAPHCLAW_CONFIG_PATH", ""))
     env.setdefault("GRAPHCLAW_HOME", str(_graphclaw_home()))
-    cmd = [_jac_executable(), "start", "graphclaw/dashboard.jac", "--port", str(cfg["port"])]
+    cmd = [_jac_executable(), "start", "graphclaw/dashboard.jac", "--dev", "--port", str(cfg["port"])]
     proc = subprocess.Popen(
         cmd,
         cwd=str(_repo_root()),
