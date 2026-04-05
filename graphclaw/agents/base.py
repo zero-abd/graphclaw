@@ -114,6 +114,14 @@ class BaseAgent:
                     try:
                         tool_result = await tool.execute(**tc.arguments)
                         result.tools_used.append(tc.name)
+                        if (
+                            tc.name == "request_skill_install"
+                            and isinstance(tool_result, str)
+                            and "install" in tool_result.lower()
+                            and "continue without" in tool_result.lower()
+                        ):
+                            result.content = tool_result
+                            return result
                     except Exception as e:
                         tool_result = f"Tool error: {e}\n{traceback.format_exc()}"
                 else:

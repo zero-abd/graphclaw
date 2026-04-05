@@ -19,7 +19,7 @@ from graphclaw.config.loader import load_config
 
 class _SearchClawHubTool:
     name = "search_clawhub"
-    description = "Search ClawHub (clawhub.ai) for available skills/plugins."
+    description = "Search ClawHub (clawhub.ai) for manual skill browsing. If you need approval-aware discovery and installation, use request_skill_install instead."
     parameters = {
         "type": "object",
         "properties": {
@@ -35,7 +35,7 @@ class _SearchClawHubTool:
 
 class _InstallSkillTool:
     name = "install_skill"
-    description = "Install a skill from ClawHub by slug or from a GitHub URL."
+    description = "Install a skill from ClawHub by slug or from a GitHub URL only when the user has already explicitly approved or requested that exact skill. Use request_skill_install for discovery plus approval."
     parameters = {
         "type": "object",
         "properties": {
@@ -79,7 +79,9 @@ class DevOpsAgent(BaseAgent):
         "containers, and cloud services. You can also search and install skills from ClawHub "
         "(clawhub.ai) — the OpenClaw skills registry. Use shell commands for system operations. "
         "Primary skills are OpenClaw-style SKILL.md bundles that you should read and follow before "
-        "inventing a custom workflow. Legacy native Python skills remain fallback-only.\n"
+        "inventing a custom workflow. Legacy native Python skills remain fallback-only. "
+        "If no installed skill is strong enough, use request_skill_install so the user can approve the install; "
+        "do not rely on raw search_clawhub results alone for that approval flow.\n"
         "Always verify before making destructive changes."
     )
 

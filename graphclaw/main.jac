@@ -26,6 +26,7 @@ def dispatch_message(msg: InboundMessage) {
         get_memory_context,
         start_session,
     )
+    from graphclaw.skills.approval import maybe_handle_skill_install_reply
 
     def _extract_content(result: object) -> str:
         if result is None:
@@ -75,6 +76,33 @@ def dispatch_message(msg: InboundMessage) {
                 return
 
             assistant_name = get_assistant_name()
+            skill_install_reply = await maybe_handle_skill_install_reply(
+                msg.text,
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                user_id=msg.user_id,
+            )
+            if skill_install_reply is not None and skill_install_reply.get("handled"):
+                resumed_content = ""
+                if skill_install_reply.get("resume_query"):
+                    resumed_result = await run_coordinator(
+                        query=skill_install_reply["resume_query"],
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        user_id=msg.user_id,
+                        assistant_name=assistant_name,
+                    )
+                    resumed_content = _extract_content(resumed_result)
+
+                content = str(skill_install_reply.get("message", "") or "").strip()
+                if resumed_content:
+                    content = f"{content}\n\n{resumed_content}" if content else resumed_content
+
+                append_turn(session_id=session_id, role="assistant", content=content)
+                consolidate_session(session_id)
+                bus.publish_outbound(OutboundMessage(channel=msg.channel, chat_id=msg.chat_id, text=content))
+                return
+
             renamed_to = extract_assistant_name_change(msg.text)
             if renamed_to:
                 content = f"Got it — I'll go by {renamed_to} from now on."
