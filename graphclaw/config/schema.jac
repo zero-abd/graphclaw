@@ -1,11 +1,11 @@
 # graphclaw/config/schema.jac
-# Configuration schema — mirrors nanobot's Pydantic approach but in Jac obj types
+# Configuration schema -- mirrors nanobot's Pydantic approach but in Jac obj types
 
-import from pydantic { BaseModel, Field };
-import from pydantic_settings { BaseSettings };
-import from typing { Optional, Dict, Any, List };
+import from pydantic { BaseModel, Field }
+import from pydantic_settings { BaseSettings }
+import from typing { Optional, Dict, Any, List }
 
-# ── LLM Provider ──────────────────────────────────────────────────────────────
+# -- LLM Provider --------------------------------------------------------------
 
 obj ProviderConfig {
     has api_key: str = "";
@@ -29,7 +29,7 @@ obj ProvidersConfig {
     has custom: ProviderConfig = ProviderConfig();
 }
 
-# ── Agent Defaults ─────────────────────────────────────────────────────────────
+# -- Agent Defaults -------------------------------------------------------------
 
 obj DreamConfig {
     has enabled: bool = True;
@@ -50,7 +50,7 @@ obj AgentDefaults {
     has dream: DreamConfig = DreamConfig();
 }
 
-# ── Tools ─────────────────────────────────────────────────────────────────────
+# -- Tools ---------------------------------------------------------------------
 
 obj ExecToolConfig {
     has enabled: bool = True;
@@ -75,7 +75,7 @@ obj ToolsConfig {
     has mcp_servers: dict = {};
 }
 
-# ── Channels ──────────────────────────────────────────────────────────────────
+# -- Channels ------------------------------------------------------------------
 
 obj TelegramConfig {
     has enabled: bool = False;
@@ -127,7 +127,7 @@ obj ChannelsConfig {
     has whatsapp: WhatsAppConfig = WhatsAppConfig();
 }
 
-# ── Skills ────────────────────────────────────────────────────────────────────
+# -- Skills --------------------------------------------------------------------
 
 obj SkillsConfig {
     has registry_url: str = "https://clawhub.ai/api/v1";   # ClawHub public registry
@@ -135,7 +135,7 @@ obj SkillsConfig {
     has installed_path: str = "~/.graphclaw/skills/installed";
 }
 
-# ── Auth (multi-user) ─────────────────────────────────────────────────────────
+# -- Auth (multi-user) ---------------------------------------------------------
 
 obj AuthConfig {
     has enabled: bool = False;    # flipped to True in multi-user install
@@ -143,7 +143,7 @@ obj AuthConfig {
     has token_expiry_hours: int = 168;  # 7 days
 }
 
-# ── Root Config ───────────────────────────────────────────────────────────────
+# -- Root Config ---------------------------------------------------------------
 
 obj Config {
     has workspace: str = "~/.graphclaw/workspace";

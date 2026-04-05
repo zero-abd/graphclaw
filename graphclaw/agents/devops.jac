@@ -1,23 +1,23 @@
 # graphclaw/agents/devops.jac
-# DevOps agent — taps into a skill directory dynamically
+# DevOps agent -- taps into a skill directory dynamically
 # Supports two skill types:
-#   "native"  — skill.json + skill.py (base44, loveable) — tools are Python functions
-#   "clawhub" — SKILL.md from clawhub.ai — tools return instructions the agent follows
+#   "native"  -- skill.json + skill.py (base44, loveable) -- tools are Python functions
+#   "clawhub" -- SKILL.md from clawhub.ai -- tools return instructions the agent follows
 
-import from graphclaw.agents.base { BaseAgent, AgentTool, AgentResult };
+import from graphclaw.agents.base { BaseAgent, AgentTool, AgentResult }
 import from graphclaw.skills.loader {
     LoadSkills, ListSkills, GetSkill, InvokeSkillTool,
     InstallSkill, SearchClawHub
 };
-import from graphclaw.tools.shell { ShellTool };
-import from graphclaw.tools.filesystem { ReadFileTool, WriteFileTool, ListDirTool };
-import from graphclaw.tools.web { WebSearchTool, WebFetchTool };
+import from graphclaw.tools.shell { ShellTool }
+import from graphclaw.tools.filesystem { ReadFileTool, WriteFileTool, ListDirTool }
+import from graphclaw.tools.web { WebSearchTool, WebFetchTool }
 
-# ── DevOps agent ───────────────────────────────────────────────────────────────
+# -- DevOps agent ---------------------------------------------------------------
 
 walker DevOpsAgent(BaseAgent) {
     has agent_name: str = "devops";
-    has agent_description: str = "DevOps engineer agent — CI/CD, infrastructure, deployments, app platforms";
+    has agent_description: str = "DevOps engineer agent -- CI/CD, infrastructure, deployments, app platforms";
     has system_prompt_extra: str = """
 You are an expert DevOps engineer. You can:
 - Deploy and manage apps on Base44 and Loveable (built-in skills)
@@ -28,7 +28,7 @@ You are an expert DevOps engineer. You can:
 
 **Available skill types:**
 - Native skills (base44, loveable): call `<skillname>__<toolname>` with specific parameters
-- ClawHub skills: call `clawhub__<skillname>` with `{"task": "what to accomplish"}` — you get
+- ClawHub skills: call `clawhub__<skillname>` with `{"task": "what to accomplish"}` -- you get
   back the skill's instructions, then use your shell/web tools to follow them
 
 When given a task:
@@ -38,7 +38,7 @@ When given a task:
 4. Report progress and store important findings in memory
 """;
 
-    can run with `root entry {
+    can run with `root() entry {
         LoadSkills() spawn here;
         self._tools = self._build_tools(here);
         ::jac::
@@ -49,7 +49,7 @@ When given a task:
     def _build_tools(graph_root) -> list[AgentTool] {
         tools = [];
 
-        # ── Built-in tools ──────────────────────────────────────────────────
+        # -- Built-in tools --------------------------------------------------
         tools.append(ShellTool());
         tools.append(ReadFileTool());
         tools.append(WriteFileTool());
@@ -57,12 +57,12 @@ When given a task:
         tools.append(WebSearchTool());
         tools.append(WebFetchTool());
 
-        # ── Registry tools ─────────────────────────────────────────────────
+        # -- Registry tools -------------------------------------------------
         tools.append(self._make_search_clawhub_tool(graph_root));
         tools.append(self._make_install_skill_tool(graph_root));
         tools.append(self._make_list_skills_tool(graph_root));
 
-        # ── Skill-backed tools (from all enabled skills) ────────────────────
+        # -- Skill-backed tools (from all enabled skills) --------------------
         skill_list = ListSkills(enabled_only=True) spawn graph_root;
         for sk in (skill_list or []) {
             if sk.get("skill_type", "native") == "clawhub" {
@@ -75,7 +75,7 @@ When given a task:
                         self.name = f"clawhub__{skill_meta['name']}"
                         self.description = (
                             f"[ClawHub] {skill_meta.get('description', '')} "
-                            f"— pass task='what you want to do'"
+                            f"-- pass task='what you want to do'"
                         )
                         self.parameters_schema = {
                             "type": "object",
@@ -175,7 +175,7 @@ When given a task:
                 for skill in items[:10]:
                     slug = skill.get("slug", skill.get("name", "?"))
                     desc = skill.get("description", "")[:120]
-                    lines.append(f"- `{slug}` — {desc}")
+                    lines.append(f"- `{slug}` -- {desc}")
                 lines.append(f"\nTo install: call install_skill with source='<slug>'")
                 return "\n".join(lines)
         _tool = _SearchClawHubTool(_root)
@@ -250,13 +250,13 @@ When given a task:
                     if stype == "clawhub":
                         lines.append(
                             f"- **clawhub__{sk['name']}** v{sk.get('version','?')} "
-                            f"[ClawHub] — {sk.get('description','')}"
+                            f"[ClawHub] -- {sk.get('description','')}"
                         )
                     else:
                         tlist = ", ".join(sk.get("tools", []))
                         lines.append(
                             f"- **{sk['name']}** v{sk.get('version','?')} "
-                            f"[native] — {sk.get('description','')} | tools: {tlist}"
+                            f"[native] -- {sk.get('description','')} | tools: {tlist}"
                         )
                 return "\n".join(lines)
         _tool = _ListSkillsTool(_root)

@@ -5,10 +5,10 @@ import from graphclaw.memory.nodes {
     Memory, Session, Topic, Turn, UserProfile,
     MemoryType, Relates, Produced, Tagged, HasSession, HasMemory, HasTurn, HasProfile
 };
-import from datetime { datetime, timezone };
-import from uuid { uuid4 };
+import from datetime { datetime, timezone }
+import from uuid { uuid4 }
 
-# ── Store a memory node ────────────────────────────────────────────────────────
+# -- Store a memory node --------------------------------------------------------
 
 walker StoreMemory {
     has content: str;
@@ -18,7 +18,7 @@ walker StoreMemory {
     has agent: str = "";
     has _result_id: str = "";
 
-    can store with `root entry {
+    can store with `root() entry {
         m = Memory(
             content=self.content,
             mem_type=self.mem_type,
@@ -32,7 +32,7 @@ walker StoreMemory {
     }
 }
 
-# ── Link two memories ──────────────────────────────────────────────────────────
+# -- Link two memories ----------------------------------------------------------
 
 walker LinkMemories {
     has from_id: str;
@@ -40,7 +40,7 @@ walker LinkMemories {
     has relationship: str = "related_to";
     has weight: float = 1.0;
 
-    can link with `root entry {
+    can link with `root() entry {
         mems = [here -->(:HasMemory:)--> (:Memory)][? id == self.from_id];
         targets = [here -->(:HasMemory:)--> (:Memory)][? id == self.to_id];
         if mems and targets {
@@ -51,13 +51,13 @@ walker LinkMemories {
     }
 }
 
-# ── Tag a memory with a topic ──────────────────────────────────────────────────
+# -- Tag a memory with a topic --------------------------------------------------
 
 walker TagMemory {
     has memory_id: str;
     has topic_name: str;
 
-    can tag with `root entry {
+    can tag with `root() entry {
         mems = [here -->(:HasMemory:)--> (:Memory)][? id == self.memory_id];
         if not mems { report False; disengage; }
         mem = mems[0];
@@ -75,12 +75,12 @@ walker TagMemory {
     }
 }
 
-# ── Revalidate (reset decay clock) ────────────────────────────────────────────
+# -- Revalidate (reset decay clock) --------------------------------------------
 
 walker RevalidateMemory {
     has memory_id: str;
 
-    can revalidate with `root entry {
+    can revalidate with `root() entry {
         mems = [here -->(:HasMemory:)--> (:Memory)][? id == self.memory_id];
         if mems {
             mems[0].touch();
@@ -90,12 +90,12 @@ walker RevalidateMemory {
     }
 }
 
-# ── Tombstone (soft-delete) ────────────────────────────────────────────────────
+# -- Tombstone (soft-delete) ----------------------------------------------------
 
 walker TombstoneMemory {
     has memory_id: str;
 
-    can tombstone with `root entry {
+    can tombstone with `root() entry {
         mems = [here -->(:HasMemory:)--> (:Memory)][? id == self.memory_id];
         if mems {
             mems[0].tombstoned = True;
@@ -106,7 +106,7 @@ walker TombstoneMemory {
     }
 }
 
-# ── Record a session ───────────────────────────────────────────────────────────
+# -- Record a session -----------------------------------------------------------
 
 walker StartSession {
     has channel: str;
@@ -115,7 +115,7 @@ walker StartSession {
     has agent: str = "coordinator";
     has model: str = "";
 
-    can start with `root entry {
+    can start with `root() entry {
         s = Session(
             channel=self.channel,
             chat_id=self.chat_id,
@@ -128,7 +128,7 @@ walker StartSession {
     }
 }
 
-# ── Append a turn to an existing session ──────────────────────────────────────
+# -- Append a turn to an existing session --------------------------------------
 
 walker AppendTurn {
     has session_id: str;
@@ -138,7 +138,7 @@ walker AppendTurn {
     has tool_result: str = "";
     has token_count: int = 0;
 
-    can append with `root entry {
+    can append with `root() entry {
         sessions = [here -->(:HasSession:)--> (:Session)][? session_id == self.session_id];
         if not sessions { report None; disengage; }
         s = sessions[0];
@@ -156,14 +156,14 @@ walker AppendTurn {
     }
 }
 
-# ── Upsert user profile ────────────────────────────────────────────────────────
+# -- Upsert user profile --------------------------------------------------------
 
 walker UpsertProfile {
     has display_name: str = "";
     has timezone: str = "UTC";
     has preferred_model: str = "";
 
-    can upsert with `root entry {
+    can upsert with `root() entry {
         profiles = [here -->(:HasProfile:)--> (:UserProfile)];
         if profiles {
             p = profiles[0];

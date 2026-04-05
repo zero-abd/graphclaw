@@ -1,6 +1,6 @@
 # graphclaw/tools/web.jac
 
-import from graphclaw.agents.base { AgentTool };
+import from graphclaw.agents.base { AgentTool }
 
 obj WebSearchTool(AgentTool) {
     has name: str = "web_search";

@@ -100,6 +100,26 @@ graphclaw              # interactive CLI
 
 ---
 
+## Update
+
+**Linux / macOS / WSL:**
+```bash
+cd ~/.graphclaw/source   # or wherever you cloned graphclaw
+git pull
+~/.graphclaw/venv/bin/pip install -e . -q
+```
+
+**Windows (PowerShell):**
+```powershell
+cd ~\.graphclaw\source   # or wherever you cloned graphclaw
+git pull
+~\.graphclaw\venv\Scripts\pip install -e . -q
+```
+
+Or re-run the installer — it will overwrite the existing venv and config.
+
+---
+
 ## Quick Start
 
 **CLI mode:**

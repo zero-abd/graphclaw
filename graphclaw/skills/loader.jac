@@ -3,17 +3,17 @@
 # Skills can be loaded from:
 #   1. Built-in registry (graphclaw/skills/registry/)
 #   2. User-installed skills (~/.graphclaw/skills/installed/)
-#   3. Online — GitHub URL or central registry index
+#   3. Online -- GitHub URL or central registry index
 
-import from pathlib { Path };
-import from importlib { import_module };
-import from json { loads, dumps };
-import from os { environ };
-import from graphclaw.config.loader { load_config };
-import from datetime { datetime, timezone };
+import from pathlib { Path }
+import from importlib { import_module }
+import from json { loads, dumps }
+import from os { environ }
+import from graphclaw.config.loader { load_config }
+import from datetime { datetime, timezone }
 import httpx;
 
-# ── Skill node in the graph ────────────────────────────────────────────────────
+# -- Skill node in the graph ----------------------------------------------------
 
 node SkillNode {
     has name: str = "";
@@ -41,7 +41,7 @@ node SkillNode {
 
 edge HasSkill {}
 
-# ── Skill manifest format (skill.json in each skill directory) ─────────────────
+# -- Skill manifest format (skill.json in each skill directory) -----------------
 #
 # {
 #   "name": "base44",
@@ -56,16 +56,16 @@ edge HasSkill {}
 glob BUILTIN_SKILLS_DIR: str = str(Path(__file__).parent / "registry");
 glob CLAWHUB_BASE_URL: str = "https://clawhub.ai";
 
-# ── Scan and register built-in + installed skills ─────────────────────────────
+# -- Scan and register built-in + installed skills -----------------------------
 
 walker LoadSkills {
-    can load with `root entry {
+    can load with `root() entry {
         cfg = load_config();
         installed_dir = Path(cfg.skills.installed_path).expanduser();
 
         loaded = [];
 
-        # ── Built-in native skills (skill.json + skill.py) ─────────────────
+        # -- Built-in native skills (skill.json + skill.py) -----------------
         builtin_dir = Path(BUILTIN_SKILLS_DIR);
         if builtin_dir.exists() {
             for skill_dir in builtin_dir.iterdir() {
@@ -94,7 +94,7 @@ walker LoadSkills {
             }
         }
 
-        # ── User-installed skills: native (skill.json) or ClawHub (SKILL.md) ─
+        # -- User-installed skills: native (skill.json) or ClawHub (SKILL.md) -
         if installed_dir.exists() {
             for skill_dir in installed_dir.iterdir() {
                 if not skill_dir.is_dir() { continue; }
@@ -167,12 +167,12 @@ walker LoadSkills {
     }
 }
 
-# ── List available skills ──────────────────────────────────────────────────────
+# -- List available skills ------------------------------------------------------
 
 walker ListSkills {
     has enabled_only: bool = True;
 
-    can list with `root entry {
+    can list with `root() entry {
         skills = [here -->(:HasSkill:)--> (:SkillNode)];
         if self.enabled_only {
             skills = [s for s in skills if s.enabled];
@@ -191,12 +191,12 @@ walker ListSkills {
     }
 }
 
-# ── Get a skill by name ────────────────────────────────────────────────────────
+# -- Get a skill by name --------------------------------------------------------
 
 walker GetSkill {
     has name: str;
 
-    can get with `root entry {
+    can get with `root() entry {
         skills = [here -->(:HasSkill:)--> (:SkillNode)][
             ? name == self.name and enabled == True
         ];
@@ -205,14 +205,14 @@ walker GetSkill {
     }
 }
 
-# ── Invoke a tool from a skill ─────────────────────────────────────────────────
+# -- Invoke a tool from a skill -------------------------------------------------
 
 walker InvokeSkillTool {
     has skill_name: str;
     has tool_name: str;    # ignored for clawhub skills
     has params: dict = {};
 
-    can invoke with `root entry {
+    can invoke with `root() entry {
         skills = [here -->(:HasSkill:)--> (:SkillNode)][
             ? name == self.skill_name and enabled == True
         ];
@@ -222,7 +222,7 @@ walker InvokeSkillTool {
         }
         sk = skills[0];
 
-        # ── ClawHub skill: return instructions for the agent to follow ──────
+        # -- ClawHub skill: return instructions for the agent to follow ------
         if sk.skill_type == "clawhub" {
             task = self.params.get("task", "(no task specified)");
             env_note = "";
@@ -237,7 +237,7 @@ walker InvokeSkillTool {
             disengage;
         }
 
-        # ── Native skill: dynamically import and call Python function ────────
+        # -- Native skill: dynamically import and call Python function --------
         if self.tool_name not in sk.tools {
             report {"error": f"Tool '{self.tool_name}' not found in skill '{self.skill_name}'"};
             disengage;
@@ -280,13 +280,13 @@ walker InvokeSkillTool {
     }
 }
 
-# ── Search ClawHub registry ────────────────────────────────────────────────────
+# -- Search ClawHub registry ----------------------------------------------------
 
 walker SearchClawHub {
     has query: str;
     has limit: int = 10;
 
-    can search with `root entry {
+    can search with `root() entry {
         ::py::
         import httpx
         try:
@@ -305,13 +305,13 @@ walker SearchClawHub {
     }
 }
 
-# ── List skills on ClawHub ─────────────────────────────────────────────────────
+# -- List skills on ClawHub -----------------------------------------------------
 
 walker ListClawHubSkills {
     has limit: int = 20;
     has offset: int = 0;
 
-    can list with `root entry {
+    can list with `root() entry {
         ::py::
         import httpx
         try:
@@ -330,13 +330,13 @@ walker ListClawHubSkills {
     }
 }
 
-# ── Install a skill — ClawHub slug or direct GitHub URL ───────────────────────
+# -- Install a skill -- ClawHub slug or direct GitHub URL -----------------------
 
 walker InstallSkill {
     has source: str;   # "kubernetes" | "https://github.com/org/repo/..."
     has force: bool = False;
 
-    can install with `root entry {
+    can install with `root() entry {
         # If it's a URL, treat as a GitHub release ZIP (native skill.json format)
         if self.source.startswith("http") {
             report self._install_from_url(here);
@@ -516,12 +516,12 @@ walker InstallSkill {
     }
 }
 
-# ── Remove an installed skill ──────────────────────────────────────────────────
+# -- Remove an installed skill --------------------------------------------------
 
 walker UninstallSkill {
     has name: str;
 
-    can uninstall with `root entry {
+    can uninstall with `root() entry {
         skills = [here -->(:HasSkill:)--> (:SkillNode)][? name == self.name];
         if not skills {
             report {"error": f"Skill '{self.name}' not found"};

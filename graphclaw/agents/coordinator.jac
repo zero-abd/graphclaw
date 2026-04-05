@@ -1,8 +1,8 @@
 # graphclaw/agents/coordinator.jac
-# Coordinator — routes incoming messages to the right agent
+# Coordinator -- routes incoming messages to the right agent
 
-import from graphclaw.agents.base { BaseAgent, AgentTool, AgentResult };
-import from graphclaw.config.loader { load_config };
+import from graphclaw.agents.base { BaseAgent, AgentTool, AgentResult }
+import from graphclaw.config.loader { load_config }
 
 sem classify_intent = "Given a user message, determine which agent should handle it. Return the agent name: devops, planner, builder, researcher, or coordinator (if it's a general question or none of the others fit).";
 
@@ -16,7 +16,7 @@ def classify_intent(message: str, available_agents: list[str]) -> IntentClassifi
 
 walker CoordinatorAgent(BaseAgent) {
     has agent_name: str = "coordinator";
-    has agent_description: str = "Coordinator — routes tasks to the right specialist agent";
+    has agent_description: str = "Coordinator -- routes tasks to the right specialist agent";
     has system_prompt_extra: str = """
 You are the central coordinator for Graphclaw. You:
 - Answer general questions directly
@@ -27,7 +27,7 @@ You are the central coordinator for Graphclaw. You:
 
     has available_agents: list[str] = ["devops", "planner", "builder", "researcher"];
 
-    can route with `root entry {
+    can route with `root() entry {
         # Classify intent
         intent = classify_intent(self.query, self.available_agents);
 

@@ -1,10 +1,10 @@
 # graphclaw/providers/base.jac
-# LLM provider abstraction — mirrors nanobot's provider layer, ported to Jac
+# LLM provider abstraction -- mirrors nanobot's provider layer, ported to Jac
 # All providers speak the same interface; byllm/litellm handles the heavy lifting
 
-import from dataclasses { dataclass, field };
-import from typing { AsyncGenerator };
-import from abc { ABC, abstractmethod };
+import from dataclasses { dataclass, field }
+import from typing { AsyncGenerator }
+import from abc { ABC, abstractmethod }
 
 obj ToolCallRequest {
     has id: str;
@@ -33,7 +33,7 @@ obj GenerationSettings {
     has extra: dict = {};
 }
 
-# ── Base provider ABC ─────────────────────────────────────────────────────────
+# -- Base provider ABC ---------------------------------------------------------
 
 obj LLMProvider {
     has name: str;
@@ -72,7 +72,7 @@ obj LLMProvider {
     }
 }
 
-# ── OpenAI-compatible provider (used by OpenRouter, DeepSeek, Groq, etc.) ────
+# -- OpenAI-compatible provider (used by OpenRouter, DeepSeek, Groq, etc.) ----
 
 obj OpenAICompatProvider(LLMProvider) {
     def chat_completion(
@@ -155,7 +155,7 @@ obj OpenAICompatProvider(LLMProvider) {
     }
 }
 
-# ── Anthropic provider (direct, for prompt caching support) ──────────────────
+# -- Anthropic provider (direct, for prompt caching support) ------------------
 
 obj AnthropicProvider(LLMProvider) {
     has name: str = "anthropic";

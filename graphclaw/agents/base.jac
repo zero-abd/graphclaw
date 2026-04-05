@@ -1,14 +1,15 @@
 # graphclaw/agents/base.jac
-# Base agent walker — all agents inherit from this
+# Base agent walker -- all agents inherit from this
 
-import from graphclaw.providers.registry { get_provider };
-import from graphclaw.providers.base { GenerationSettings, LLMResponse, ToolCallRequest };
-import from graphclaw.memory.recall { Recall, GetMemoryContext };
-import from graphclaw.memory.store { AppendTurn, StartSession };
-import from graphclaw.config.loader { load_config };
-import from datetime { datetime, timezone };
+import from graphclaw.providers.registry { get_provider }
+import from graphclaw.providers.base { GenerationSettings, LLMResponse, ToolCallRequest }
+import from graphclaw.memory.recall { Recall, GetMemoryContext }
+import from graphclaw.memory.store { AppendTurn, StartSession }
+import from graphclaw.config.loader { load_config }
+import from datetime { datetime, timezone }
+import from typing { Any }
 
-# ── Agent result ───────────────────────────────────────────────────────────────
+# -- Agent result ---------------------------------------------------------------
 
 obj AgentResult {
     has content: str;
@@ -19,7 +20,7 @@ obj AgentResult {
     has iterations: int = 0;
 }
 
-# ── Tool definition for agent tool-use ────────────────────────────────────────
+# -- Tool definition for agent tool-use ----------------------------------------
 
 obj AgentTool {
     has name: str;
@@ -29,7 +30,7 @@ obj AgentTool {
     def execute(params: dict) -> str abs;
 }
 
-# ── Base agent walker ─────────────────────────────────────────────────────────
+# -- Base agent walker ---------------------------------------------------------
 
 walker BaseAgent {
     has query: str;
@@ -39,7 +40,7 @@ walker BaseAgent {
     has session_id: str = "";
     has model: str = "";
     has stream: bool = False;
-    has on_token: any = None;   # callback for streaming tokens
+    has on_token: Any = None;   # callback for streaming tokens
 
     # Set by subclasses
     has agent_name: str = "base";
@@ -54,7 +55,7 @@ walker BaseAgent {
     has _tools_used: list[str] = [];
     has _iterations: int = 0;
 
-    can run with `root entry {
+    can run with `root() entry {
         cfg = load_config();
         model = self.model or cfg.agents.model;
         provider = get_provider(model);

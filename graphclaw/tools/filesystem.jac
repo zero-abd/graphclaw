@@ -1,6 +1,6 @@
 # graphclaw/tools/filesystem.jac
 
-import from graphclaw.agents.base { AgentTool };
+import from graphclaw.agents.base { AgentTool }
 
 obj ReadFileTool(AgentTool) {
     has name: str = "read_file";

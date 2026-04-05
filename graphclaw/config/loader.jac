@@ -1,10 +1,10 @@
 # graphclaw/config/loader.jac
 # Loads config from ~/.graphclaw/config.json or GRAPHCLAW_CONFIG env var
 
-import from graphclaw.config.schema { Config };
-import from pathlib { Path };
-import from os { environ, path };
-import from json { loads, dumps };
+import from graphclaw.config.schema { Config }
+import from pathlib { Path }
+import from os { environ, path }
+import from json { loads, dumps }
 
 glob _config: Config | None = None;
 

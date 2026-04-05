@@ -1,13 +1,13 @@
 # graphclaw/memory/recall.jac
-# Recall walkers — substring (fast) + semantic (by llm) dual-mode
+# Recall walkers -- substring (fast) + semantic (by llm) dual-mode
 
-import from graphclaw.memory.nodes { Memory, Topic, MemoryType, HasMemory, Tagged };
+import from graphclaw.memory.nodes { Memory, Topic, MemoryType, HasMemory, Tagged }
 
-# ── Semantic relevance check (used when semantic=True) ─────────────────────────
+# -- Semantic relevance check (used when semantic=True) -------------------------
 
 def is_semantically_relevant(query: str, content: str) -> bool by llm();
 
-# ── Main recall walker ─────────────────────────────────────────────────────────
+# -- Main recall walker ---------------------------------------------------------
 
 walker Recall {
     has query: str;
@@ -16,7 +16,7 @@ walker Recall {
     has mem_type: str = "";               # optional type filter
     has min_confidence: float = 0.1;      # skip near-zero confidence nodes
 
-    can search with `root entry {
+    can search with `root() entry {
         # Pull all live memories
         all_mems = [here -->(:HasMemory:)--> (:Memory)][? tombstoned == False];
 
@@ -33,7 +33,7 @@ walker Recall {
             }
         }
 
-        # Substring pass (always run first — fast)
+        # Substring pass (always run first -- fast)
         q_lower = self.query.lower();
         substring_hits = [m for m in candidates if q_lower in m.content.lower()];
 
@@ -66,13 +66,13 @@ walker Recall {
     }
 }
 
-# ── Recall by type ─────────────────────────────────────────────────────────────
+# -- Recall by type -------------------------------------------------------------
 
 walker RecallByType {
     has mem_type: str;
     has limit: int = 20;
 
-    can fetch with `root entry {
+    can fetch with `root() entry {
         mems = [here -->(:HasMemory:)--> (:Memory)][
             ? mem_type == self.mem_type and tombstoned == False
         ];
@@ -82,13 +82,13 @@ walker RecallByType {
     }
 }
 
-# ── Recall by topic ────────────────────────────────────────────────────────────
+# -- Recall by topic ------------------------------------------------------------
 
 walker RecallByTopic {
     has topic_name: str;
     has limit: int = 20;
 
-    can fetch with `root entry {
+    can fetch with `root() entry {
         topics = [here -->][?:Topic][? name == self.topic_name];
         if not topics { report []; disengage; }
 
@@ -99,13 +99,13 @@ walker RecallByTopic {
     }
 }
 
-# ── Recall session turns ───────────────────────────────────────────────────────
+# -- Recall session turns -------------------------------------------------------
 
 walker RecallSession {
     has session_id: str;
     has last_n: int = 50;
 
-    can fetch with `root entry {
+    can fetch with `root() entry {
         import from graphclaw.memory.nodes { Session, Turn, HasSession, HasTurn };
         sessions = [here -->(:HasSession:)--> (:Session)][
             ? session_id == self.session_id
@@ -120,12 +120,12 @@ walker RecallSession {
     }
 }
 
-# ── Get all memories as context string (for system prompt injection) ───────────
+# -- Get all memories as context string (for system prompt injection) -----------
 
 walker GetMemoryContext {
     has max_chars: int = 4000;
 
-    can build with `root entry {
+    can build with `root() entry {
         mems = [here -->(:HasMemory:)--> (:Memory)][? tombstoned == False];
         mems.sort(key=lambda m: m.effective_confidence(), reverse=True);
 

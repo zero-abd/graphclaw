@@ -2,8 +2,8 @@
 # Uses the Node.js Baileys bridge (from nanobot/bridge/)
 # Bridge must be running separately: cd bridge && npm start
 
-import from graphclaw.channels.bus { bus, InboundMessage, OutboundMessage };
-import from graphclaw.config.loader { load_config };
+import from graphclaw.channels.bus { bus, InboundMessage, OutboundMessage }
+import from graphclaw.config.loader { load_config }
 
 def start_whatsapp_channel() {
     ::py::

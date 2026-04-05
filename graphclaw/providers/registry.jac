@@ -1,10 +1,10 @@
 # graphclaw/providers/registry.jac
-# Maps model strings to providers — same multi-provider approach as nanobot
+# Maps model strings to providers -- same multi-provider approach as nanobot
 
 import from graphclaw.providers.base {
     LLMProvider, OpenAICompatProvider, AnthropicProvider, GenerationSettings
 };
-import from graphclaw.config.loader { load_config };
+import from graphclaw.config.loader { load_config }
 
 glob _provider_cache: dict = {};
 
@@ -25,7 +25,7 @@ def get_provider(model: str = "") -> LLMProvider {
 def _resolve_provider(model: str, cfg) -> LLMProvider {
     m = model.lower();
 
-    # OpenRouter (default) — handles almost everything
+    # OpenRouter (default) -- handles almost everything
     if m.startswith("openrouter/") or "/" not in m {
         or_model = model if "/" in model else f"openrouter/{model}";
         return OpenAICompatProvider(

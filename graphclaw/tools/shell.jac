@@ -1,6 +1,6 @@
 # graphclaw/tools/shell.jac
 
-import from graphclaw.agents.base { AgentTool };
+import from graphclaw.agents.base { AgentTool }
 
 obj ShellTool(AgentTool) {
     has name: str = "shell";
