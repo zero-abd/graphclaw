@@ -5,7 +5,7 @@
 import from graphclaw.memory.nodes {
     Memory, Session, Turn, Topic, MemoryType,
     HasMemory, HasSession, HasTurn, Produced, Tagged
-};
+}
 
 # -- LLM-powered extraction -----------------------------------------------------
 

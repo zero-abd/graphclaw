@@ -4,7 +4,7 @@
 import from graphclaw.memory.nodes {
     Memory, Session, Topic, Turn, UserProfile,
     MemoryType, Relates, Produced, Tagged, HasSession, HasMemory, HasTurn, HasProfile
-};
+}
 import from datetime { datetime, timezone }
 import from uuid { uuid4 }
 
