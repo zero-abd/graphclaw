@@ -315,7 +315,7 @@ echo ""
 ask_choice "Select first chat interface [1-4]" "1 2 3 4" "1"
 CHANNEL_CHOICE="$REPLY"
 
-TG_TOKEN=""; DC_TOKEN=""; SL_BOT_TOKEN=""; SL_APP_TOKEN=""
+TG_TOKEN=""; TG_USERNAME=""; DC_TOKEN=""; SL_BOT_TOKEN=""; SL_APP_TOKEN=""
 
 resolve_telegram_bot_username() {
     local token="$1"
@@ -677,3 +677,12 @@ echo -e "  ${D}Later, manage updates safely with:${NC}"
 echo -e "       ${W}graphclaw update${NC}"
 echo -e "       ${W}graphclaw rollback${NC}"
 echo ""
+if [ -n "$TG_USERNAME" ]; then
+    echo -e "  ${BOLD}${W}Send this to your client${NC}"
+    echo -e "  ${D}──────────────────────────────────────────${NC}"
+    echo -e "  ${W}Open https://t.me/$TG_USERNAME, press Start, then send me any message.${NC}"
+    echo -e "  ${D}If Telegram replies with a pairing code, approve it in this terminal with:${NC}"
+    echo -e "       ${W}pairing list telegram${NC}"
+    echo -e "       ${W}pairing approve telegram <code>${NC}"
+    echo ""
+fi

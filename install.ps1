@@ -368,7 +368,7 @@ Write-Color "    4)  Skip for now -- configure later" White
 Write-Host ""
 
 $ChannelChoice = ask_choice "Select first chat interface [1-4]" @("1","2","3","4") "1"
-$TgToken = ""; $DcToken = ""; $SlBotToken = ""; $SlAppToken = ""
+$TgToken = ""; $TgUsername = ""; $DcToken = ""; $SlBotToken = ""; $SlAppToken = ""
 
 function Resolve-TelegramBotUsername {
     param([string]$Token)
@@ -393,9 +393,9 @@ function Configure-Telegram {
     $script:TgToken = ask_optional "Paste Telegram bot token"
     if ($script:TgToken) {
         ok "Telegram configured"
-        $tgUsername = Resolve-TelegramBotUsername $script:TgToken
-        if ($tgUsername) {
-            hint "Client onboarding link: https://t.me/$tgUsername"
+        $script:TgUsername = Resolve-TelegramBotUsername $script:TgToken
+        if ($script:TgUsername) {
+            hint "Client onboarding link: https://t.me/$script:TgUsername"
             hint "Tell the client to open that link, press Start, then send any message."
         } else {
             hint "Next step: open your bot in Telegram, press Start, then send any message."
@@ -703,6 +703,15 @@ Write-Color "  Later, manage updates safely with:" DarkGray
 Write-Color "         graphclaw update" White
 Write-Color "         graphclaw rollback" White
 Write-Host ""
+if ($TgUsername) {
+    Write-Color "  Send this to your client" White
+    Write-Color ("  " + ("-" * 42)) DarkGray
+    Write-Color "  Open https://t.me/$TgUsername, press Start, then send me any message." White
+    Write-Color "  If Telegram replies with a pairing code, approve it in this terminal with:" DarkGray
+    Write-Color "         pairing list telegram" White
+    Write-Color "         pairing approve telegram <code>" White
+    Write-Host ""
+}
 if ($MultiUser -eq "true") {
     Write-Color "  Start as HTTP server:" White
     Write-Color "      jac start graphclaw/main.jac" Cyan
