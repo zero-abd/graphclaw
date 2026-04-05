@@ -407,14 +407,12 @@ case "$CHANNEL_CHOICE" in
 esac
 
 echo ""
-echo -e "  ${D}DevOps skill API keys — all optional, press Enter to skip:${NC}"
+echo -e "  ${D}Dev tool integrations:${NC}"
 echo ""
-hint "Base44: app.base44.com/settings → API Keys"
-ask_optional "Base44 API key"
-BASE44_KEY="$REPLY"
-hint "Loveable: lovable.dev/settings → API"
-ask_optional "Loveable API key"
-LOVEABLE_KEY="$REPLY"
+hint "Base44 uses the official Base44 CLI flow. On first use, Graphclaw can call `base44` (or `npx --yes base44@latest`) and you may be prompted to log in."
+hint "Loveable uses official Build with URL links, so no API key is required for the fast website-generation flow."
+BASE44_KEY=""
+LOVEABLE_KEY=""
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STEP 6 — Write config & shell integration
@@ -524,8 +522,6 @@ GRAPHCLAW_HOME="$GRAPHCLAW_DIR" \
 OPENROUTER_KEY="$OPENROUTER_KEY" \
 ANTHROPIC_KEY="$ANTHROPIC_KEY" \
 OPENAI_KEY="$OPENAI_KEY" \
-BASE44_KEY="$BASE44_KEY" \
-LOVEABLE_KEY="$LOVEABLE_KEY" \
 "$PYTHON" - <<'PY'
 import os
 from pathlib import Path
@@ -545,8 +541,6 @@ updates = {
     "OPENROUTER_API_KEY": os.environ["OPENROUTER_KEY"],
     "ANTHROPIC_API_KEY": os.environ["ANTHROPIC_KEY"],
     "OPENAI_API_KEY": os.environ["OPENAI_KEY"],
-    "BASE44_API_KEY": os.environ["BASE44_KEY"],
-    "LOVEABLE_API_KEY": os.environ["LOVEABLE_KEY"],
 }
 for key, value in updates.items():
     if value:
@@ -561,8 +555,6 @@ for key in [
     "OPENROUTER_API_KEY",
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
-    "BASE44_API_KEY",
-    "LOVEABLE_API_KEY",
 ]:
     value = existing.get(key, "")
     if value:

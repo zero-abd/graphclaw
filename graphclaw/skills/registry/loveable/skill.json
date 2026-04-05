@@ -1,17 +1,12 @@
 {
   "name": "loveable",
-  "description": "Build, deploy, and manage full-stack apps on Loveable AI app platform",
+  "description": "Generate official Lovable Build with URL links and publish-ready guidance for fast website and app creation",
   "version": "0.1.0",
   "author": "graphclaw",
   "tools": [
-    "list_projects",
-    "get_project",
-    "create_project",
-    "publish_project",
-    "get_project_status",
-    "get_project_url",
-    "send_prompt",
-    "get_chat_history"
+    "build_with_url",
+    "build_landing_page_url",
+    "publish_guide"
   ],
   "requirements": [],
   "source_url": "https://clawhub.ai/skills/loveable"

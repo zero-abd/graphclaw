@@ -1,112 +1,91 @@
-"""
-Loveable skill — tools for building and managing apps via the Loveable platform.
-Configure via env vars:
-    LOVEABLE_API_KEY   — your Loveable API key
-    LOVEABLE_BASE_URL  — API base URL (default: https://api.lovable.dev/v1)
-"""
+"""Official Loveable integration using Build with URL links."""
 
-import os
-import httpx
+from __future__ import annotations
 
-_BASE_URL = os.environ.get("LOVEABLE_BASE_URL", "https://api.lovable.dev/v1")
-_API_KEY = os.environ.get("LOVEABLE_API_KEY", "")
+import webbrowser
+from urllib.parse import quote
 
 
-def _headers() -> dict:
-    if not _API_KEY:
-        raise ValueError("LOVEABLE_API_KEY env var is not set")
-    return {"Authorization": f"Bearer {_API_KEY}", "Content-Type": "application/json"}
+_BASE_URL = "https://lovable.dev/?autosubmit=true#"
 
 
-async def list_projects() -> dict:
-    """List all Loveable projects in your account."""
-    async with httpx.AsyncClient() as client:
-        r = await client.get(f"{_BASE_URL}/projects", headers=_headers(), timeout=15.0)
-        r.raise_for_status()
-        return r.json()
+def _encode_images(images: list[str]) -> str:
+    parts = []
+    for image in images[:10]:
+        cleaned = str(image or "").strip()
+        if cleaned:
+            parts.append(f"images={quote(cleaned, safe=':/?=&')}")
+    return "&".join(parts)
 
 
-async def get_project(project_id: str) -> dict:
-    """Get details for a specific project."""
-    async with httpx.AsyncClient() as client:
-        r = await client.get(
-            f"{_BASE_URL}/projects/{project_id}", headers=_headers(), timeout=15.0
-        )
-        r.raise_for_status()
-        return r.json()
+def build_with_url(prompt: str, images: list[str] | None = None, open_browser: bool = False) -> dict:
+    """Create a docs-supported Lovable Build with URL link.
 
-
-async def create_project(name: str, description: str = "") -> dict:
-    """Create a new Loveable project.
-    Args:
-        name: Project name
-        description: Optional project description
+    This opens Lovable and begins creating the app after the user logs in
+    and picks a workspace. It does not publish the app automatically.
     """
-    async with httpx.AsyncClient() as client:
-        r = await client.post(
-            f"{_BASE_URL}/projects",
-            headers=_headers(),
-            json={"name": name, "description": description},
-            timeout=30.0
-        )
-        r.raise_for_status()
-        return r.json()
+    cleaned_prompt = str(prompt or "").strip()
+    if not cleaned_prompt:
+        raise ValueError("prompt is required")
+
+    params = [f"prompt={quote(cleaned_prompt, safe='')}"]
+    if images:
+        image_params = _encode_images(images)
+        if image_params:
+            params.append(image_params)
+
+    url = _BASE_URL + "&".join(params)
+    if open_browser:
+        webbrowser.open(url)
+
+    return {
+        "url": url,
+        "kind": "loveable-build-url",
+        "notes": [
+            "Open the link while logged into Lovable to start generation automatically.",
+            "After the project is ready, click Publish to get a live [published-url].lovable.app link.",
+            "Lovable lets you set a custom subdomain during publish and add a custom domain later on paid plans.",
+        ],
+    }
 
 
-async def publish_project(project_id: str) -> dict:
-    """Publish/deploy a Loveable project to make it publicly accessible."""
-    async with httpx.AsyncClient() as client:
-        r = await client.post(
-            f"{_BASE_URL}/projects/{project_id}/publish",
-            headers=_headers(),
-            timeout=60.0
-        )
-        r.raise_for_status()
-        return r.json()
+def build_landing_page_url(
+    brief: str,
+    brand_name: str = "",
+    primary_cta: str = "",
+    style_notes: str = "",
+    images: list[str] | None = None,
+    open_browser: bool = False,
+) -> dict:
+    """Generate a polished landing-page Build with URL link for Lovable."""
+    pieces = [
+        "Create a polished responsive landing page website.",
+        "Use modern spacing, strong hierarchy, and production-ready copy placeholders.",
+        "Include a hero section, features section, testimonials, FAQ, and a strong CTA footer.",
+    ]
+    if brand_name:
+        pieces.append(f"Brand/product name: {brand_name}.")
+    if brief:
+        pieces.append(f"Product brief: {brief}.")
+    if primary_cta:
+        pieces.append(f"Primary CTA: {primary_cta}.")
+    if style_notes:
+        pieces.append(f"Style notes: {style_notes}.")
+    pieces.append("Make it launch-ready and visually impressive.")
+    return build_with_url(" ".join(pieces), images=images, open_browser=open_browser)
 
 
-async def get_project_status(project_id: str) -> dict:
-    """Get the current build/deployment status of a project."""
-    async with httpx.AsyncClient() as client:
-        r = await client.get(
-            f"{_BASE_URL}/projects/{project_id}/status", headers=_headers(), timeout=15.0
-        )
-        r.raise_for_status()
-        return r.json()
-
-
-async def get_project_url(project_id: str) -> dict:
-    """Get the live URL for a published project."""
-    async with httpx.AsyncClient() as client:
-        r = await client.get(
-            f"{_BASE_URL}/projects/{project_id}/url", headers=_headers(), timeout=15.0
-        )
-        r.raise_for_status()
-        return r.json()
-
-
-async def send_prompt(project_id: str, prompt: str) -> dict:
-    """Send a natural language prompt to Loveable to modify the project.
-    Args:
-        project_id: The project to modify
-        prompt: Natural language instruction (e.g. 'Add a dark mode toggle to the navbar')
-    """
-    async with httpx.AsyncClient() as client:
-        r = await client.post(
-            f"{_BASE_URL}/projects/{project_id}/chat",
-            headers=_headers(),
-            json={"message": prompt},
-            timeout=120.0  # AI edits can take time
-        )
-        r.raise_for_status()
-        return r.json()
-
-
-async def get_chat_history(project_id: str) -> dict:
-    """Get the chat/prompt history for a project."""
-    async with httpx.AsyncClient() as client:
-        r = await client.get(
-            f"{_BASE_URL}/projects/{project_id}/chat", headers=_headers(), timeout=15.0
-        )
-        r.raise_for_status()
-        return r.json()
+def publish_guide() -> dict:
+    """Return the official Lovable publish flow in a compact checklist."""
+    return {
+        "steps": [
+            "Open your Lovable project and click Publish in the top-right corner.",
+            "Choose or accept the published URL subdomain; Lovable defaults to [published-url].lovable.app.",
+            "Review website access and metadata, then click Publish.",
+            "Use Publish → Update for later changes, and add a custom domain later if needed.",
+        ],
+        "notes": [
+            "Publishing deploys a snapshot; future changes are not live until you publish again.",
+            "The published URL is separate from editor visibility.",
+        ],
+    }
