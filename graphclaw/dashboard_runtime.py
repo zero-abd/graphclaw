@@ -59,6 +59,11 @@ def dashboard_url() -> str:
     return f"http://{cfg['host']}:{cfg['port']}/"
 
 
+def dashboard_api_url() -> str:
+    cfg = _dashboard_config()
+    return f"http://{cfg['host']}:{cfg['port'] + 1}/"
+
+
 def _jac_executable() -> str:
     jac = shutil.which("jac")
     return jac or "jac"
@@ -70,6 +75,18 @@ def _is_dashboard_reachable(url: str, timeout: float = 0.4) -> bool:
             return 200 <= int(response.status) < 500
     except Exception:
         return False
+
+
+def _recent_log_excerpt() -> str:
+    path = _log_path()
+    if not path.exists():
+        return ""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception:
+        return ""
+    excerpt = text[-1200:].strip()
+    return excerpt
 
 
 def _read_state() -> dict[str, Any]:
@@ -110,6 +127,7 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
         return None
 
     url = dashboard_url()
+    api_url = dashboard_api_url()
     _cleanup_stale_state(url)
     state = _read_state()
     pid = int(state.get("pid", 0) or 0)
@@ -147,13 +165,23 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
 
     atexit.register(_shutdown_dashboard)
 
-    for _ in range(30):
+    for _ in range(60):
         if _is_dashboard_reachable(url):
             if open_browser and cfg["auto_open"]:
                 webbrowser.open(url)
             return url
         if proc.poll() is not None:
             break
-        time.sleep(0.2)
+        time.sleep(0.5)
 
-    return url
+    if proc.poll() is None and _is_dashboard_reachable(api_url):
+        raise RuntimeError(
+            "Dashboard API started, but the web UI did not become reachable. "
+            "Make sure jac-client and bun are installed, then try again.\n"
+            + _recent_log_excerpt()
+        )
+
+    raise RuntimeError(
+        "Dashboard web UI failed to start.\n"
+        + (_recent_log_excerpt() or "No dashboard logs were captured.")
+    )
