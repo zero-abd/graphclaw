@@ -54,6 +54,16 @@ class DashboardConfig(BaseModel):
     port: int = 18789
 
 
+class MCPServerConfig(BaseModel):
+    enabled: bool = True
+    url: str = ""
+    command: str = ""
+    args: List[str] = Field(default_factory=list)
+    env: Dict[str, str] = Field(default_factory=dict)
+    cwd: str = ""
+    headers: Dict[str, str] = Field(default_factory=dict)
+
+
 class Config(BaseModel):
     workspace: str = ""
     multi_user: bool = False
@@ -92,3 +102,4 @@ class Config(BaseModel):
     auth: AuthConfig = Field(default_factory=AuthConfig)
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
+    mcp_servers: Dict[str, MCPServerConfig] = Field(default_factory=dict, alias="mcpServers")

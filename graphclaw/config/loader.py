@@ -28,6 +28,8 @@ def load_config(path: Optional[str] = None, *, force_reload: bool = False) -> Co
         data = json.loads(p.read_text(encoding="utf-8"))
     else:
         data = {}
+    if "mcpServers" in data and "mcp_servers" not in data:
+        data["mcp_servers"] = data["mcpServers"]
 
     cfg = Config(**data)
 
@@ -51,7 +53,7 @@ def load_config(path: Optional[str] = None, *, force_reload: bool = False) -> Co
 def save_config(cfg: Config, path: Optional[str] = None) -> None:
     p = Path(path) if path else _default_config_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(cfg.model_dump(), indent=2, default=str), encoding="utf-8")
+    p.write_text(json.dumps(cfg.model_dump(by_alias=True), indent=2, default=str), encoding="utf-8")
 
 
 def ensure_workspace() -> None:
