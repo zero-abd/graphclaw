@@ -78,6 +78,22 @@ def _jac_executable() -> str:
     return jac or "jac"
 
 
+def _dashboard_start_command(port: int) -> list[str]:
+    if os.name == "nt":
+        return [
+            sys.executable,
+            "-X",
+            "utf8",
+            "-m",
+            "jaclang.jac0core.cli_boot",
+            "start",
+            "--dev",
+            "--port",
+            str(port),
+        ]
+    return [_jac_executable(), "start", "--dev", "--port", str(port)]
+
+
 def _with_repo_on_pythonpath(env: dict[str, str]) -> dict[str, str]:
     updated = dict(env)
     repo_root = str(_repo_root())
@@ -197,7 +213,7 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
     env = _with_dashboard_subprocess_env(dict(os.environ))
     env.setdefault("GRAPHCLAW_CONFIG_PATH", os.environ.get("GRAPHCLAW_CONFIG_PATH", ""))
     env.setdefault("GRAPHCLAW_HOME", str(_graphclaw_home()))
-    cmd = [_jac_executable(), "start", "--dev", "--port", str(cfg["port"])]
+    cmd = _dashboard_start_command(cfg["port"])
     proc = subprocess.Popen(
         cmd,
         cwd=str(_dashboard_project_root()),

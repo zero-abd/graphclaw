@@ -36,6 +36,23 @@ def test_dashboard_subprocess_env_enforces_utf8(monkeypatch):
     assert env['PYTHONUTF8'] == '1'
 
 
+def test_dashboard_start_command_uses_python_utf8_on_windows(monkeypatch):
+    monkeypatch.setattr(dashboard_runtime.os, 'name', 'nt')
+    monkeypatch.setattr(dashboard_runtime.sys, 'executable', r'C:\Python313\python.exe')
+    cmd = dashboard_runtime._dashboard_start_command(18789)
+    assert cmd == [
+        r'C:\Python313\python.exe',
+        '-X',
+        'utf8',
+        '-m',
+        'jaclang.jac0core.cli_boot',
+        'start',
+        '--dev',
+        '--port',
+        '18789',
+    ]
+
+
 def test_ensure_local_dashboard_launches_jac_from_dashboard_app(monkeypatch):
     monkeypatch.setattr(
         dashboard_runtime,
