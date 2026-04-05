@@ -61,12 +61,25 @@ def dashboard_url() -> str:
 
 def dashboard_api_url() -> str:
     cfg = _dashboard_config()
-    return f"http://{cfg['host']}:{cfg['port'] + 1}/"
+    return f"http://{cfg['host']}:{cfg['port']}/api/overview"
 
 
 def _jac_executable() -> str:
     jac = shutil.which("jac")
     return jac or "jac"
+
+
+def _with_repo_on_pythonpath(env: dict[str, str]) -> dict[str, str]:
+    updated = dict(env)
+    repo_root = str(_repo_root())
+    current = updated.get("PYTHONPATH", "")
+    if current:
+        entries = current.split(os.pathsep)
+        if repo_root not in entries:
+            updated["PYTHONPATH"] = os.pathsep.join([repo_root, *entries])
+    else:
+        updated["PYTHONPATH"] = repo_root
+    return updated
 
 
 def _is_dashboard_reachable(url: str, timeout: float = 0.4) -> bool:
@@ -137,10 +150,18 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
         return url
 
     log_handle = _log_path().open("a", encoding="utf-8")
-    env = dict(os.environ)
+    env = _with_repo_on_pythonpath(dict(os.environ))
     env.setdefault("GRAPHCLAW_CONFIG_PATH", os.environ.get("GRAPHCLAW_CONFIG_PATH", ""))
     env.setdefault("GRAPHCLAW_HOME", str(_graphclaw_home()))
-    cmd = [_jac_executable(), "start", "graphclaw/dashboard.jac", "--dev", "--port", str(cfg["port"])]
+    cmd = [
+        sys.executable,
+        "-m",
+        "graphclaw.dashboard_server",
+        "--host",
+        cfg["host"],
+        "--port",
+        str(cfg["port"]),
+    ]
     proc = subprocess.Popen(
         cmd,
         cwd=str(_repo_root()),
@@ -176,8 +197,7 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
 
     if proc.poll() is None and _is_dashboard_reachable(api_url):
         raise RuntimeError(
-            "Dashboard API started, but the web UI did not become reachable. "
-            "Make sure jac-client and bun are installed, then try again.\n"
+            "Dashboard API started, but the web UI did not become reachable.\n"
             + _recent_log_excerpt()
         )
 
