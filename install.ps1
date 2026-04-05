@@ -227,12 +227,20 @@ info "Upgrading pip..."
 & $VenvPython -m pip install --upgrade pip -q 2>&1 | Out-Null
 
 info "Installing jaclang (Jac runtime)..."
-& $VenvPip install "jaclang>=0.7.0" -q 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { $ErrorActionPreference = "Stop"; fail "Failed to install jaclang." }
+$jacOut = & $VenvPip install "jaclang>=0.6.1" 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Color "  pip output:" DarkGray
+    $jacOut | ForEach-Object { Write-Color "    $_" DarkGray }
+    $ErrorActionPreference = "Stop"; fail "Failed to install jaclang."
+}
 
 info "Installing graphclaw..."
-& $VenvPip install -e $ScriptDir -q 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { $ErrorActionPreference = "Stop"; fail "Failed to install graphclaw." }
+$gcOut = & $VenvPip install -e $ScriptDir 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Color "  pip output:" DarkGray
+    $gcOut | ForEach-Object { Write-Color "    $_" DarkGray }
+    $ErrorActionPreference = "Stop"; fail "Failed to install graphclaw."
+}
 
 $ErrorActionPreference = "Stop"
 
