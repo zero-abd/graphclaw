@@ -21,7 +21,7 @@ class WebSearchTool:
         max_results = kwargs.get("max_results", 5)
 
         try:
-            from duckduckgo_search import DDGS
+            from ddgs import DDGS
             with DDGS() as ddg:
                 results = list(ddg.text(query, max_results=max_results))
             if not results:
@@ -34,7 +34,7 @@ class WebSearchTool:
                 lines.append("")
             return "\n".join(lines)
         except ImportError:
-            return "Error: duckduckgo-search not installed — pip install duckduckgo-search"
+            return "Error: ddgs not installed — pip install ddgs"
         except Exception as e:
             return f"Error searching: {e}"
 
