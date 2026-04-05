@@ -15,17 +15,62 @@ Inspired by **[nanobot](https://github.com/HKUDS/nanobot)** and **[openclaw](htt
 
 ---
 
-## Why Graphclaw
+## Install
 
-|  | nanobot | openclaw | **Graphclaw** |
-|---|---|---|---|
-| Language | Python | TypeScript | **Jac + Python** |
-| Core memory | Flat markdown | Files + runtime state | **Workspace-backed knowledge graph** |
-| Skills | Prompt/files | SKILL.md ecosystem | **Native skills + OpenClaw-style SKILL.md + ClawHub** |
-| MCP support | Limited / external | Core concept | **Configured MCP servers exposed to all agents** |
-| Browser automation | Usually external | Growing ecosystem | **Playwright-backed browser helpers** |
-| Dashboard | External / ad hoc | Web-first control UI | **Jac-native dashboard app** |
-| Initial graph state | Usually empty | Tool/runtime first | **Seeded root graph with identity, skills, MCP, dream cadence** |
+**Requirements:**
+- **[Python 3.12+](https://docs.python.org/3.12/)**
+- **[Git](https://git-scm.com/)**
+
+**Linux / macOS / WSL:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.ps1 | iex
+```
+
+**Local clone:**
+```bash
+git clone https://github.com/zero-abd/graphclaw
+cd graphclaw
+bash install.sh
+```
+
+The installer configures:
+1. deployment mode
+2. default model provider
+3. first chat channel
+4. optional builder skill credentials
+
+Then launch:
+```bash
+graphclaw
+```
+
+Windows:
+```powershell
+graphclaw
+```
+
+
+---
+
+## Positioning
+
+Graphclaw is not trying to pretend OpenClaw is "worse". The lineage and tradeoffs are different:
+
+|  | OpenClaw | Clawdbot / Moltbot lineage | nanobot | **Graphclaw** |
+|---|---|---|---|---|
+| Primary implementation style | TypeScript / web-first agent runtime | Earlier claw-style local agent lineage | Python lightweight assistant | **Jac + Python graph-native runtime** |
+| Core memory approach | Files, skills, runtime state, growing MCP ecosystem | Local claw-style tool/skill workflows | Flat markdown / file memory | **Workspace-backed knowledge graph** |
+| Skills | Strong SKILL.md ecosystem | Early claw-style skill/runtime ideas | Limited compared with claw ecosystems | **Native skills + OpenClaw-style SKILL.md + ClawHub** |
+| MCP | Major part of the ecosystem direction | Part of the broader claw ecosystem conversation | Not the defining focus | **Configured MCP servers exposed to all agents** |
+| Dashboard / operator UI | Important product surface | More runtime/tooling focused historically | Usually minimal | **Jac-native dashboard app** |
+| What Graphclaw is actually adding | — | — | — | **Graph memory, seeded root graph, Jac-native dashboard, graph-first runtime structure** |
+
+If you already know OpenClaw, the shortest honest description is: **Graphclaw keeps the claw-style agent/skill feel, but re-centers the runtime around a persistent knowledge graph and Jac-native control surfaces.**
 
 ---
 
@@ -95,45 +140,6 @@ Graphclaw includes Playwright-backed browser helpers for:
 - automation support for builder/platform flows
 
 ---
-
-## Install
-
-**Requirements:**
-- **[Python 3.12+](https://docs.python.org/3.12/)**
-- **[Git](https://git-scm.com/)**
-
-**Linux / macOS / WSL:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.sh | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-irm https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.ps1 | iex
-```
-
-**Local clone:**
-```bash
-git clone https://github.com/zero-abd/graphclaw
-cd graphclaw
-bash install.sh
-```
-
-The installer configures:
-1. deployment mode
-2. default model provider
-3. first chat channel
-4. optional builder skill credentials
-
-Then launch:
-```bash
-graphclaw
-```
-
-Windows:
-```powershell
-graphclaw
-```
 
 ---
 
