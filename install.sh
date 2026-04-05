@@ -234,7 +234,7 @@ step "LLM provider & channels"
 
 echo -e "  ${D}Choose your default LLM provider:${NC}"
 echo ""
-echo -e "    ${W}1)${NC} ${BOLD}OpenRouter${NC}   ${D}— one key, access to all major models  ${G}(recommended)${NC}"
+echo -e "    ${W}1)${NC} ${BOLD}OpenRouter${NC}   ${D}— one key, route models like Claude through OpenRouter  ${G}(recommended)${NC}"
 echo -e "    ${W}2)${NC} ${BOLD}Anthropic${NC}    ${D}— Claude direct${NC}"
 echo -e "    ${W}3)${NC} ${BOLD}OpenAI${NC}       ${D}— GPT-4o / GPT-4.1${NC}"
 echo -e "    ${W}4)${NC} ${BOLD}Ollama${NC}       ${D}— local models, no API key needed${NC}"
@@ -249,26 +249,48 @@ PROVIDER_NAME="OpenRouter"
 
 case "$PROVIDER_CHOICE" in
     1)
-        hint "Get your key at: openrouter.ai/keys"
-        ask_required "OpenRouter API key"
+        hint "OpenRouter key only — you do NOT need an Anthropic key for the default Claude-via-OpenRouter model"
+        hint "Get your key at: https://openrouter.ai/keys"
+        ask_optional "Paste OpenRouter API key now"
         OPENROUTER_KEY="$REPLY"
-        ok "OpenRouter configured"
+        if [ -n "$OPENROUTER_KEY" ]; then
+            ok "OpenRouter configured"
+        else
+            hint "Set it later with an environment variable instead:"
+            hint "macOS / Linux: export OPENROUTER_API_KEY='your-key'"
+            hint "Windows PowerShell: $env:OPENROUTER_API_KEY='your-key'"
+            warn "No OpenRouter key saved yet — Graphclaw will prompt again in the CLI if it needs one"
+        fi
         ;;
     2)
-        hint "Get your key at: console.anthropic.com/settings/keys"
-        ask_required "Anthropic API key"
+        hint "Get your key at: https://console.anthropic.com/settings/keys"
+        ask_optional "Paste Anthropic API key now"
         ANTHROPIC_KEY="$REPLY"
         DEFAULT_MODEL="anthropic/claude-sonnet-4-6"
         PROVIDER_NAME="Anthropic"
-        ok "Anthropic configured"
+        if [ -n "$ANTHROPIC_KEY" ]; then
+            ok "Anthropic configured"
+        else
+            hint "Set it later with an environment variable instead:"
+            hint "macOS / Linux: export ANTHROPIC_API_KEY='your-key'"
+            hint "Windows PowerShell: $env:ANTHROPIC_API_KEY='your-key'"
+            warn "No Anthropic key saved yet — Graphclaw will prompt again in the CLI if it needs one"
+        fi
         ;;
     3)
-        hint "Get your key at: platform.openai.com/api-keys"
-        ask_required "OpenAI API key"
+        hint "Get your key at: https://platform.openai.com/api-keys"
+        ask_optional "Paste OpenAI API key now"
         OPENAI_KEY="$REPLY"
         DEFAULT_MODEL="openai/gpt-4o"
         PROVIDER_NAME="OpenAI"
-        ok "OpenAI configured"
+        if [ -n "$OPENAI_KEY" ]; then
+            ok "OpenAI configured"
+        else
+            hint "Set it later with an environment variable instead:"
+            hint "macOS / Linux: export OPENAI_API_KEY='your-key'"
+            hint "Windows PowerShell: $env:OPENAI_API_KEY='your-key'"
+            warn "No OpenAI key saved yet — Graphclaw will prompt again in the CLI if it needs one"
+        fi
         ;;
     4)
         DEFAULT_MODEL="ollama/llama3"

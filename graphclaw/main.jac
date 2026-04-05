@@ -110,6 +110,7 @@ with entry {
     import asyncio
     import sys
 
+    from graphclaw.setup_runtime import maybe_prompt_for_provider_key
     from graphclaw.update_manager import maybe_prompt_for_update
 
     cfg = load_config()
@@ -144,6 +145,9 @@ with entry {
         print("[graphclaw] channels: " + ", ".join(channels_started))
     else:
         print("[graphclaw] no channels enabled -- running in CLI mode")
+        key_prompt = maybe_prompt_for_provider_key()
+        if key_prompt.action == "saved":
+            print(f"[graphclaw] {key_prompt.message}")
         update_prompt = maybe_prompt_for_update()
         if update_prompt.action == "updated":
             print(f"[graphclaw] {update_prompt.message}")

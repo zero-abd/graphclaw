@@ -292,7 +292,7 @@ Step "LLM provider & channels"
 
 Write-Color "  Choose your default LLM provider:" DarkGray
 Write-Host ""
-Write-Color "    1)  OpenRouter   -- one key, access to all major models  (recommended)" White
+Write-Color "    1)  OpenRouter   -- one key, route models like Claude through OpenRouter  (recommended)" White
 Write-Color "    2)  Anthropic    -- Claude direct (claude.ai/settings -> API Keys)" White
 Write-Color "    3)  OpenAI       -- GPT-4o (platform.openai.com/api-keys)" White
 Write-Color "    4)  Ollama       -- local models, no API key needed" White
@@ -306,23 +306,45 @@ $ProviderName   = "OpenRouter"
 
 switch ($ProviderChoice) {
     "1" {
-        hint "Get your key at: openrouter.ai/keys"
-        $OpenrouterKey = ask_required "OpenRouter API key"
-        ok "OpenRouter configured"
+        hint "OpenRouter key only -- you do NOT need an Anthropic key for the default Claude-via-OpenRouter model"
+        hint "Get your key at: https://openrouter.ai/keys"
+        $OpenrouterKey = ask_optional "Paste OpenRouter API key now"
+        if ($OpenrouterKey) {
+            ok "OpenRouter configured"
+        } else {
+            hint "Set it later with an environment variable instead:"
+            hint "macOS / Linux: export OPENROUTER_API_KEY='your-key'"
+            hint "Windows PowerShell: `$env:OPENROUTER_API_KEY='your-key'"
+            warn "No OpenRouter key saved yet -- Graphclaw will prompt again in the CLI if it needs one"
+        }
     }
     "2" {
-        hint "Get your key at: console.anthropic.com/settings/keys"
-        $AnthropicKey = ask_required "Anthropic API key"
+        hint "Get your key at: https://console.anthropic.com/settings/keys"
+        $AnthropicKey = ask_optional "Paste Anthropic API key now"
         $DefaultModel = "anthropic/claude-sonnet-4-6"
         $ProviderName = "Anthropic"
-        ok "Anthropic configured"
+        if ($AnthropicKey) {
+            ok "Anthropic configured"
+        } else {
+            hint "Set it later with an environment variable instead:"
+            hint "macOS / Linux: export ANTHROPIC_API_KEY='your-key'"
+            hint "Windows PowerShell: `$env:ANTHROPIC_API_KEY='your-key'"
+            warn "No Anthropic key saved yet -- Graphclaw will prompt again in the CLI if it needs one"
+        }
     }
     "3" {
-        hint "Get your key at: platform.openai.com/api-keys"
-        $OpenaiKey = ask_required "OpenAI API key"
+        hint "Get your key at: https://platform.openai.com/api-keys"
+        $OpenaiKey = ask_optional "Paste OpenAI API key now"
         $DefaultModel = "openai/gpt-4o"
         $ProviderName = "OpenAI"
-        ok "OpenAI configured"
+        if ($OpenaiKey) {
+            ok "OpenAI configured"
+        } else {
+            hint "Set it later with an environment variable instead:"
+            hint "macOS / Linux: export OPENAI_API_KEY='your-key'"
+            hint "Windows PowerShell: `$env:OPENAI_API_KEY='your-key'"
+            warn "No OpenAI key saved yet -- Graphclaw will prompt again in the CLI if it needs one"
+        }
     }
     "4" {
         $DefaultModel = "ollama/llama3"
@@ -468,12 +490,12 @@ providers.setdefault("openrouter", {"base_url": "https://openrouter.ai/api/v1"})
 providers.setdefault("anthropic", {})
 providers.setdefault("openai", {})
 providers.setdefault("ollama", {"base_url": "http://localhost:11434"})
-if os.environ["GRAPHCLAW_OPENROUTER_KEY"]:
+if os.environ.get("GRAPHCLAW_OPENROUTER_KEY"):
     providers["openrouter"]["api_key"] = os.environ["GRAPHCLAW_OPENROUTER_KEY"]
 providers["openrouter"].setdefault("base_url", "https://openrouter.ai/api/v1")
-if os.environ["GRAPHCLAW_ANTHROPIC_KEY"]:
+if os.environ.get("GRAPHCLAW_ANTHROPIC_KEY"):
     providers["anthropic"]["api_key"] = os.environ["GRAPHCLAW_ANTHROPIC_KEY"]
-if os.environ["GRAPHCLAW_OPENAI_KEY"]:
+if os.environ.get("GRAPHCLAW_OPENAI_KEY"):
     providers["openai"]["api_key"] = os.environ["GRAPHCLAW_OPENAI_KEY"]
 
 channels = cfg.setdefault("channels", {})
@@ -482,21 +504,21 @@ channels.setdefault("discord", {"enabled": False, "bot_token": "", "allowed_ids"
 channels.setdefault("slack", {"enabled": False, "bot_token": "", "app_token": "", "allowed_ids": []})
 channels.setdefault("email", {"enabled": False})
 channels.setdefault("whatsapp", {"enabled": False})
-if os.environ["GRAPHCLAW_TG_TOKEN"]:
+if os.environ.get("GRAPHCLAW_TG_TOKEN"):
     channels["telegram"]["enabled"] = True
     channels["telegram"]["bot_token"] = os.environ["GRAPHCLAW_TG_TOKEN"]
-if os.environ["GRAPHCLAW_DC_TOKEN"]:
+if os.environ.get("GRAPHCLAW_DC_TOKEN"):
     channels["discord"]["enabled"] = True
     channels["discord"]["bot_token"] = os.environ["GRAPHCLAW_DC_TOKEN"]
-if os.environ["GRAPHCLAW_SL_BOT_TOKEN"]:
+if os.environ.get("GRAPHCLAW_SL_BOT_TOKEN"):
     channels["slack"]["enabled"] = True
     channels["slack"]["bot_token"] = os.environ["GRAPHCLAW_SL_BOT_TOKEN"]
-if os.environ["GRAPHCLAW_SL_APP_TOKEN"]:
+if os.environ.get("GRAPHCLAW_SL_APP_TOKEN"):
     channels["slack"]["app_token"] = os.environ["GRAPHCLAW_SL_APP_TOKEN"]
 
 auth = cfg.setdefault("auth", {})
 auth["enabled"] = os.environ["GRAPHCLAW_MULTI_USER"].lower() == "true"
-if os.environ["GRAPHCLAW_JWT_SECRET"]:
+if os.environ.get("GRAPHCLAW_JWT_SECRET"):
     auth["secret_key"] = os.environ["GRAPHCLAW_JWT_SECRET"]
 else:
     auth.setdefault("secret_key", "")
