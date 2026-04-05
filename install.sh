@@ -175,7 +175,7 @@ info "Upgrading pip..."
 pip install --upgrade pip -q 2>/dev/null
 
 info "Installing jaclang (Jac runtime)..."
-pip install "jaclang>=0.7.0" -q 2>/dev/null
+pip install "jaclang>=0.13.5,<0.14" -q 2>/dev/null
 ok "jaclang installed"
 
 info "Installing graphclaw..."
@@ -357,7 +357,7 @@ cat > "$GRAPHCLAW_DIR/run.sh" << RUNEOF
 #!/usr/bin/env bash
 source "$VENV_DIR/bin/activate"
 export GRAPHCLAW_CONFIG_PATH="$CONFIG_FILE"
-exec jac run "$SCRIPT_DIR/graphclaw/main.jac" "\$@"
+exec jac run --no-autonative "$SCRIPT_DIR/graphclaw/main.jac" "\$@"
 RUNEOF
 chmod +x "$GRAPHCLAW_DIR/run.sh"
 ok "Startup script: ${W}~/.graphclaw/run.sh${NC}"

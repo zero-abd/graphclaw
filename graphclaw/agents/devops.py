@@ -6,7 +6,12 @@ from graphclaw.agents.base import BaseAgent
 from graphclaw.tools.filesystem import ReadFileTool, WriteFileTool, ListDirTool
 from graphclaw.tools.shell import ShellTool
 from graphclaw.tools.web import WebSearchTool, WebFetchTool
-from graphclaw.skills.loader import search_clawhub, install_skill, list_skills
+from graphclaw.skills.loader import (
+    install_skill,
+    invoke_skill_async,
+    list_skills,
+    search_clawhub,
+)
 from graphclaw.config.loader import load_config
 
 
@@ -51,6 +56,46 @@ class _ListSkillsTool:
         return json.dumps(skills, indent=2)
 
 
+class _InvokeSkillTool:
+    name = "invoke_skill"
+    description = (
+        "Invoke an installed native skill function, or retrieve instructions for a "
+        "ClawHub SKILL.md skill."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "slug": {"type": "string", "description": "Installed skill slug"},
+            "function_name": {
+                "type": "string",
+                "description": "Native function to call (omit to list available functions)",
+                "default": "",
+            },
+            "arguments": {
+                "type": "object",
+                "description": "Arguments to pass to the native skill function",
+                "default": {},
+            },
+            "task": {
+                "type": "string",
+                "description": "Optional task description when reading a ClawHub SKILL.md",
+                "default": "",
+            },
+        },
+        "required": ["slug"],
+    }
+
+    async def execute(self, **kwargs: Any) -> str:
+        arguments = kwargs.get("arguments", {}) or {}
+        if kwargs.get("task"):
+            arguments["task"] = kwargs["task"]
+        return await invoke_skill_async(
+            kwargs["slug"],
+            kwargs.get("function_name", ""),
+            **arguments,
+        )
+
+
 class DevOpsAgent(BaseAgent):
     name = "devops"
     system_prompt = (
@@ -69,5 +114,5 @@ class DevOpsAgent(BaseAgent):
         self.tools = [
             ReadFileTool(ws), WriteFileTool(ws), ListDirTool(ws),
             ShellTool(ws), WebSearchTool(), WebFetchTool(),
-            _SearchClawHubTool(), _InstallSkillTool(), _ListSkillsTool(),
+            _SearchClawHubTool(), _InstallSkillTool(), _ListSkillsTool(), _InvokeSkillTool(),
         ]

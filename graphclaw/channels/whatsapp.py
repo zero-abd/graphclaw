@@ -62,13 +62,9 @@ async def start_whatsapp_channel() -> None:
             headers["Authorization"] = f"Bearer {api_token}"
 
         async with aiohttp.ClientSession() as session:
-            q = bus.get_outbound_queue()
+            q = bus.get_outbound_queue("whatsapp")
             while True:
                 msg: OutboundMessage = await q.get()
-                if msg.channel != "whatsapp":
-                    q.put_nowait(msg)
-                    await asyncio.sleep(0.05)
-                    continue
                 try:
                     import json
                     await session.post(

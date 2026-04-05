@@ -1,23 +1,13 @@
 # graphclaw/agents/coordinator.jac
-# Coordinator -- routes incoming messages to the right specialist agent
-# Uses Jac's `by llm()` for intent classification, calls Python agents
-
-import from graphclaw.config.loader { load_config }
-
-# -- Intent classification via LLM ------------------------------------------------
+# Coordinator -- routes incoming messages to the right specialist agent.
 
 obj IntentClassification {
-    has agent: str;         # devops | planner | builder | researcher | coordinator
-    has confidence: float;
-    has reason: str;
+    has agent: str = "coordinator";
+    has confidence: float = 0.0;
+    has reason: str = "";
 }
 
-def classify_intent(
-    message: str,
-    available_agents: list[str]
-) -> IntentClassification by llm();
-
-# -- Coordinator walker ------------------------------------------------------------
+def classify_intent(message: str, available_agents: list[str]) -> IntentClassification by llm();
 
 walker CoordinatorAgent {
     has query: str = "";
@@ -26,23 +16,21 @@ walker CoordinatorAgent {
     has user_id: str = "user";
     has model: str = "";
 
-    can route with `root() entry {
-        cfg = load_config();
+    can route with Root entry {
+        result_payload = None;
         agents = ["devops", "planner", "builder", "researcher"];
         intent = classify_intent(self.query, agents);
 
         ::py::
         import asyncio
+        import threading
 
-        agent_name = intent.agent
-        confidence = intent.confidence
-
-        # Import Python agent classes
-        from graphclaw.agents.base import BaseAgent, AgentResult
+        from graphclaw.agents.base import BaseAgent
+        from graphclaw.agents.builder import BuilderAgent
         from graphclaw.agents.devops import DevOpsAgent
         from graphclaw.agents.planner import PlannerAgent
-        from graphclaw.agents.builder import BuilderAgent
         from graphclaw.agents.researcher import ResearcherAgent
+        from graphclaw.tools.web import WebFetchTool, WebSearchTool
 
         agent_map = {
             "devops": DevOpsAgent,
@@ -60,49 +48,42 @@ walker CoordinatorAgent {
         if self.model:
             kwargs["model"] = self.model
 
-        if agent_name == "coordinator" or confidence < 0.6:
-            # Handle directly as a general assistant
+        if intent.agent == "coordinator" or intent.confidence < 0.6:
             agent = BaseAgent(**kwargs)
             agent.system_prompt = (
                 "You are Graphclaw, a helpful multi-agent AI assistant. "
-                "Answer the user's question directly and clearly. "
-                "You have access to web search and file tools if needed."
+                "Answer directly and clearly. Use tools when helpful, and be honest about uncertainty."
             )
-            from graphclaw.tools.web import WebSearchTool, WebFetchTool
             agent.tools = [WebSearchTool(), WebFetchTool()]
         else:
-            AgentClass = agent_map.get(agent_name, BaseAgent)
-            agent = AgentClass(**kwargs)
+            agent_cls = agent_map.get(intent.agent, BaseAgent)
+            agent = agent_cls(**kwargs)
 
-        # Run the Python agent
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                _result = loop.run_in_executor(pool, lambda: asyncio.run(agent.run()))
-                _result = asyncio.ensure_future(_result)
-                # For sync context, we need a different approach
-                _result = None
-                try:
-                    _result = asyncio.get_event_loop().run_until_complete(agent.run())
-                except RuntimeError:
-                    # Already running -- use create_task
-                    import threading
-                    result_holder = [None]
-                    def _run():
-                        result_holder[0] = asyncio.run(agent.run())
-                    t = threading.Thread(target=_run)
-                    t.start()
-                    t.join(timeout=300)
-                    _result = result_holder[0]
+        result_holder = {"value": None, "error": None}
+
+        def _run_agent() -> None:
+            try:
+                result_holder["value"] = asyncio.run(agent.run())
+            except Exception as exc:
+                result_holder["error"] = exc
+
+        worker = threading.Thread(target=_run_agent, daemon=True)
+        worker.start()
+        worker.join(timeout=300)
+
+        if worker.is_alive():
+            result_payload = {"content": "[Agent error] agent timed out", "error": "agent timed out"}
+        elif result_holder["error"] is not None:
+            result_payload = {
+                "content": f"[Agent error] {result_holder['error']}",
+                "error": str(result_holder["error"]),
+            }
+        elif result_holder["value"] is None:
+            result_payload = {"content": "[No response from agent]", "error": "agent returned None"}
         else:
-            _result = loop.run_until_complete(agent.run())
+            result_payload = result_holder["value"]
         ::py::
 
-        if _result {
-            report _result;
-        } else {
-            report {"content": "[No response from agent]", "error": "agent returned None"};
-        }
+        report result_payload;
     }
 }

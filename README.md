@@ -25,7 +25,7 @@ Inspired by [nanobot](https://github.com/HKUDS/nanobot) and [openclaw](https://g
 | Memory recall | LLM summarization | File scan | **Indexed graph traversal + optional semantic** |
 | Agents | Single agent | Single agent | **Multi-agent (Coordinator, DevOps, Planner, Builder, Researcher)** |
 | Skills | SKILL.md files | ClawHub | **Dynamic directory + online GitHub install** |
-| Multi-user | No | No | **Yes — per-user root graph, JWT auth** |
+| Multi-user | No | No | **Config scaffold present (runtime still alpha)** |
 | Deployment | pip | pip | **`jac run` → `jac start` → `jac start --scale` (Kubernetes)** |
 | AI functions | LLM calls | LLM calls | **`by llm()` — Meaning Typed Programming** |
 
@@ -33,7 +33,7 @@ Inspired by [nanobot](https://github.com/HKUDS/nanobot) and [openclaw](https://g
 
 ## Features
 
-🧠 **Graph Memory** — Facts live as typed nodes (`User`, `Feedback`, `Project`, `Reference`) with confidence scores that decay over time. The `Dream` walker runs in the background, merging duplicates, linking contradictions, and pruning stale nodes — without rewriting a blob of markdown.
+🧠 **Graph Memory** — Facts live as typed nodes (`User`, `Feedback`, `Project`, `Reference`) with confidence scores that decay over time. The `Dream` walker runs in the background to prune stale nodes, revalidate memories, and keep topic tags fresh — without rewriting a blob of markdown.
 
 🤖 **Multi-Agent Team** — A `Coordinator` agent classifies your intent and routes to the right specialist:
 - **DevOps** — deployments, infra, CI/CD, Base44, Loveable
@@ -41,7 +41,7 @@ Inspired by [nanobot](https://github.com/HKUDS/nanobot) and [openclaw](https://g
 - **Builder** — code writing, file editing, shell, git
 - **Researcher** — web search, knowledge extraction, memory synthesis
 
-🔌 **Skill Directory** — Skills are self-contained modules with a `skill.json` manifest and a `skill.py` tool file. Install new skills at runtime from any GitHub URL or the central registry — no restart needed.
+🔌 **Skill Directory** — Skills are self-contained modules with a `skill.json` manifest and a `skill.py` tool file. Install new skills at runtime from any GitHub URL or the central registry — no restart needed. Native skills can be listed and invoked through the DevOps agent's generic skill tools.
 
 ⚡ **Jac OSP** — Nodes connected to `root` auto-persist. Per-user isolation is built in. Walkers traverse data instead of pulling it to logic.
 
@@ -129,6 +129,8 @@ graphclaw
 > [devops] Checking Base44 apps... deploying graphclaw-demo... done ✓
 ```
 
+**Local Jac fallback:** if your Jac toolchain errors during native auto-compilation, run the CLI with `jac run --no-autonative graphclaw/main.jac` (the generated installer scripts already use this).
+
 **As an HTTP server (multi-user):**
 ```bash
 jac start graphclaw/main.jac   # → http://localhost:8000
@@ -163,8 +165,6 @@ agent.recall("deployment strategy", semantic=True)   # + LLM semantic check
 
 **Dream** runs every 2 hours:
 - Tombstones zero-confidence nodes
-- Merges near-duplicate facts
-- Links contradicting memories with `[:Relates { contradicts }]` edges
 - Auto-tags untagged memories with topic nodes
 - Revalidates still-accurate decaying memories
 
@@ -196,7 +196,7 @@ The DevOps agent reads the instructions and executes them using its built-in she
 > install the kubernetes skill
 [devops] Searching ClawHub for 'kubernetes'...
 [devops] Downloading and installing 'kubernetes' from clawhub.ai...
-✓ Skill installed — call clawhub__kubernetes to use it
+✓ Skill installed — use `invoke_skill` / follow the returned instructions to use it
 ```
 
 Or directly from the Jac graph:
@@ -209,10 +209,10 @@ InstallSkill(source="https://github.com/org/r.zip") spawn root  # direct ZIP URL
 
 | Skill | Type | Invocation |
 |---|---|---|
-| `base44` | native | `base44__deploy_app`, `base44__get_build_logs`, `base44__restart_app`, … |
-| `loveable` | native | `loveable__create_project`, `loveable__send_prompt`, … |
-| `kubernetes` *(clawhub)* | ClawHub | `clawhub__kubernetes(task="apply my manifest")` |
-| *any clawhub slug* | ClawHub | `clawhub__<slug>(task="...")` |
+| `base44` | native | `invoke_skill(slug="base44", function_name="deploy_app", arguments={...})` |
+| `loveable` | native | `invoke_skill(slug="loveable", function_name="send_prompt", arguments={...})` |
+| `kubernetes` *(clawhub)* | ClawHub | `invoke_skill(slug="kubernetes", task="apply my manifest")` |
+| *any clawhub slug* | ClawHub | `invoke_skill(slug="<slug>", task="...")` |
 
 ---
 
@@ -242,7 +242,7 @@ All agents share the same memory graph. DevOps leaving a fact about a failed dep
 | Discord | `DISCORD_BOT_TOKEN` |
 | Slack | `SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN` |
 | Email | SMTP + IMAP credentials |
-| WhatsApp | Node.js Baileys bridge (`cd bridge && npm start`) |
+| WhatsApp | External Baileys-style bridge endpoint configured via `bridge_url` |
 
 Configure in `~/.graphclaw/config.json` or via `install.sh`.
 
@@ -298,14 +298,11 @@ Full config at `~/.graphclaw/config.json`. Key fields:
 
 ## Multi-User Mode
 
-Set during install or flip `"multi_user": true` in config. Each user gets:
-- An isolated `root` graph (memories don't leak between users)
-- JWT authentication (set `AUTH_SECRET_KEY` env var)
-- Per-user session history
+`multi_user` and auth settings are present in config, but the hosted multi-user path should still be treated as **alpha scaffolding** rather than a fully production-ready auth/runtime layer.
 
 Run as an API server:
 ```bash
-jac start graphclaw/main.jac   # → http://localhost:8000/docs
+jac start graphclaw/main.jac
 ```
 
 ---
@@ -323,9 +320,8 @@ graphclaw/
 │   ├── providers/            LLM provider abstraction + registry
 │   ├── tools/                Shell, filesystem, web search/fetch
 │   └── skills/
-│       ├── loader.jac        Dynamic skill loading + online install
+│       ├── loader.py         Dynamic skill loading + online install
 │       └── registry/         Built-in skills (base44, loveable)
-├── bridge/                   WhatsApp Node.js bridge (Baileys)
 ├── install.sh                Setup wizard
 ├── jac.toml                  Jac project config
 └── pyproject.toml            Python dependencies

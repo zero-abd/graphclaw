@@ -1,8 +1,6 @@
 """Telegram channel integration using python-telegram-bot."""
 from __future__ import annotations
 import asyncio
-import traceback
-from typing import Optional
 from graphclaw.channels.bus import bus, InboundMessage, OutboundMessage
 from graphclaw.config.loader import load_config
 
@@ -47,13 +45,9 @@ async def start_telegram_channel() -> None:
 
     # Outbound send loop
     async def _send_loop() -> None:
-        q = bus.get_outbound_queue()
+        q = bus.get_outbound_queue("telegram")
         while True:
             msg: OutboundMessage = await q.get()
-            if msg.channel != "telegram":
-                q.put_nowait(msg)  # not for us, put back
-                await asyncio.sleep(0.05)
-                continue
             try:
                 await app.bot.send_message(chat_id=msg.chat_id, text=msg.text)
             except Exception as e:

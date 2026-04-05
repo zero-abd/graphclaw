@@ -1,11 +1,11 @@
 """Skill loader — discovers local skills and integrates with ClawHub API."""
 from __future__ import annotations
+import asyncio
+import inspect
 import json
-import os
 import re
-import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from graphclaw.config.loader import load_config
 
 
@@ -57,6 +57,25 @@ def list_skills() -> List[Dict[str, Any]]:
                     "path": str(entry),
                 })
     return skills
+
+
+def list_native_skill_functions(slug: str) -> List[str]:
+    """Return callable public functions exposed by a native skill."""
+    for base in [_builtin_skills_dir(), _skills_dir()]:
+        skill_dir = base / slug
+        meta_file = skill_dir / "skill.json"
+        py_file = skill_dir / "skill.py"
+        if not (meta_file.exists() and py_file.exists()):
+            continue
+        try:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location(f"skill_{slug}", str(py_file))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return [f for f in dir(mod) if not f.startswith("_") and callable(getattr(mod, f))]
+        except Exception:
+            return []
+    return []
 
 
 def _parse_frontmatter(text: str) -> Dict[str, str]:
@@ -164,6 +183,51 @@ def invoke_skill(slug: str, function_name: str = "", **kwargs: Any) -> str:
                 # If no function name, list available functions
                 fns = [f for f in dir(mod) if not f.startswith("_") and callable(getattr(mod, f))]
                 return f"Available functions in '{slug}': {', '.join(fns)}"
+            except Exception as e:
+                return f"Error invoking skill: {e}"
+
+    return f"Skill '{slug}' not found"
+
+
+async def invoke_skill_async(slug: str, function_name: str = "", **kwargs: Any) -> str:
+    """Invoke a native skill function asynchronously or return ClawHub instructions."""
+    for base in [_builtin_skills_dir(), _skills_dir()]:
+        skill_dir = base / slug
+        if not skill_dir.is_dir():
+            continue
+
+        md = skill_dir / "SKILL.md"
+        if md.exists():
+            task = kwargs.get("task", "")
+            instructions = md.read_text(encoding="utf-8")
+            if task:
+                return f"Follow this skill for task: {task}\n\n{instructions}"
+            return instructions
+
+        meta_file = skill_dir / "skill.json"
+        py_file = skill_dir / "skill.py"
+        if meta_file.exists() and py_file.exists():
+            try:
+                import importlib.util
+
+                spec = importlib.util.spec_from_file_location(f"skill_{slug}", str(py_file))
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+
+                if function_name:
+                    if not hasattr(mod, function_name):
+                        available = list_native_skill_functions(slug)
+                        return (
+                            f"Function '{function_name}' not found in skill '{slug}'. "
+                            f"Available functions: {', '.join(available) or '(none)'}"
+                        )
+                    result = getattr(mod, function_name)(**kwargs)
+                    if inspect.isawaitable(result):
+                        result = await result
+                    return str(result)
+
+                available = list_native_skill_functions(slug)
+                return f"Available functions in '{slug}': {', '.join(available) or '(none)'}"
             except Exception as e:
                 return f"Error invoking skill: {e}"
 
