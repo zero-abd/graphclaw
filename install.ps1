@@ -468,12 +468,12 @@ providers.setdefault("openrouter", {"base_url": "https://openrouter.ai/api/v1"})
 providers.setdefault("anthropic", {})
 providers.setdefault("openai", {})
 providers.setdefault("ollama", {"base_url": "http://localhost:11434"})
-if os.environ["GRAPHCLAW_OPENROUTER_KEY"]:
+if os.environ.get("GRAPHCLAW_OPENROUTER_KEY"):
     providers["openrouter"]["api_key"] = os.environ["GRAPHCLAW_OPENROUTER_KEY"]
 providers["openrouter"].setdefault("base_url", "https://openrouter.ai/api/v1")
-if os.environ["GRAPHCLAW_ANTHROPIC_KEY"]:
+if os.environ.get("GRAPHCLAW_ANTHROPIC_KEY"):
     providers["anthropic"]["api_key"] = os.environ["GRAPHCLAW_ANTHROPIC_KEY"]
-if os.environ["GRAPHCLAW_OPENAI_KEY"]:
+if os.environ.get("GRAPHCLAW_OPENAI_KEY"):
     providers["openai"]["api_key"] = os.environ["GRAPHCLAW_OPENAI_KEY"]
 
 channels = cfg.setdefault("channels", {})
@@ -482,21 +482,21 @@ channels.setdefault("discord", {"enabled": False, "bot_token": "", "allowed_ids"
 channels.setdefault("slack", {"enabled": False, "bot_token": "", "app_token": "", "allowed_ids": []})
 channels.setdefault("email", {"enabled": False})
 channels.setdefault("whatsapp", {"enabled": False})
-if os.environ["GRAPHCLAW_TG_TOKEN"]:
+if os.environ.get("GRAPHCLAW_TG_TOKEN"):
     channels["telegram"]["enabled"] = True
     channels["telegram"]["bot_token"] = os.environ["GRAPHCLAW_TG_TOKEN"]
-if os.environ["GRAPHCLAW_DC_TOKEN"]:
+if os.environ.get("GRAPHCLAW_DC_TOKEN"):
     channels["discord"]["enabled"] = True
     channels["discord"]["bot_token"] = os.environ["GRAPHCLAW_DC_TOKEN"]
-if os.environ["GRAPHCLAW_SL_BOT_TOKEN"]:
+if os.environ.get("GRAPHCLAW_SL_BOT_TOKEN"):
     channels["slack"]["enabled"] = True
     channels["slack"]["bot_token"] = os.environ["GRAPHCLAW_SL_BOT_TOKEN"]
-if os.environ["GRAPHCLAW_SL_APP_TOKEN"]:
+if os.environ.get("GRAPHCLAW_SL_APP_TOKEN"):
     channels["slack"]["app_token"] = os.environ["GRAPHCLAW_SL_APP_TOKEN"]
 
 auth = cfg.setdefault("auth", {})
 auth["enabled"] = os.environ["GRAPHCLAW_MULTI_USER"].lower() == "true"
-if os.environ["GRAPHCLAW_JWT_SECRET"]:
+if os.environ.get("GRAPHCLAW_JWT_SECRET"):
     auth["secret_key"] = os.environ["GRAPHCLAW_JWT_SECRET"]
 else:
     auth.setdefault("secret_key", "")
