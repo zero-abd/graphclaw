@@ -53,24 +53,49 @@ Inspired by [nanobot](https://github.com/HKUDS/nanobot) and [openclaw](https://g
 
 ## Install
 
+**One command. Works on Linux, macOS, and Windows.**
+
+**Linux / macOS / WSL:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/graphclaw/graphclaw/main/install.sh | bash
+```
+
+**Windows (PowerShell — run as Administrator):**
+```powershell
+irm https://raw.githubusercontent.com/graphclaw/graphclaw/main/install.ps1 | iex
+```
+
+**From a local clone:**
 ```bash
 git clone https://github.com/graphclaw/graphclaw
 cd graphclaw
-bash install.sh
+bash install.sh        # Linux / macOS / WSL
+.\install.ps1          # Windows PowerShell
 ```
 
-The installer will ask you:
+> **Requirements:** Python 3.12+ and Git. The installer handles everything else — including installing the `jac` CLI and all dependencies.
+
+The interactive wizard will ask you:
 1. **Deployment mode** — single-user (personal) or multi-user (hosted)
 2. **LLM provider** — OpenRouter, Anthropic, OpenAI, or Ollama
-3. **Channels** — Telegram, Discord, Slack tokens
-4. **Skill API keys** — Base44, Loveable (optional, add later)
+3. **Channels** — Telegram, Discord, Slack tokens *(press Enter to skip)*
+4. **Skill API keys** — Base44, Loveable *(optional, add later)*
 
 Then start:
 
 ```bash
-graphclaw          # CLI mode (no channels configured)
-# or
+source ~/.bashrc       # or ~/.zshrc — reload your shell once
+graphclaw              # interactive CLI
+# or run directly without reloading:
 ~/.graphclaw/run.sh
+```
+
+**Windows:**
+```powershell
+. $PROFILE             # reload your PowerShell profile once
+graphclaw              # interactive CLI
+# or run directly:
+~\.graphclaw\run.bat
 ```
 
 ---

@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Graph-native multi-agent AI platform"
 requires-python = ">=3.12"
 dependencies = [
-    "jaseci>=2.3.0",          # jaclang + byllm + jac-mcp + jac-scale
+    "jaclang>=0.7.0",          # jaclang + byllm + jac-mcp + jac-scale
     # Channels
     "python-telegram-bot>=21.0",
     "discord.py>=2.4.0",
