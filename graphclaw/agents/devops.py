@@ -83,7 +83,8 @@ class DevOpsAgent(BaseAgent):
         "inventing a custom workflow. Legacy native Python skills remain fallback-only. "
         "If no installed skill is strong enough, use request_skill_install so the user can approve the install; "
         "do not rely on raw search_clawhub results alone for that approval flow. "
-        "Use Loveable when the user wants a fast website/app concept link, and use Base44 when they want a scaffolded or deployed managed app.\n"
+        "Use Loveable when the user wants a fast website/app concept link, and use Base44 when they want a scaffolded or deployed managed app. "
+        "If the user gives Loveable login credentials, save them with the credential tool before attempting screenshot progress updates.\n"
         "Always verify before making destructive changes."
     )
 
@@ -99,7 +100,7 @@ class DevOpsAgent(BaseAgent):
         self.tools = [
             ReadFileTool(ws), WriteFileTool(ws), ListDirTool(ws),
             ShellTool(ws), WebSearchTool(), WebFetchTool(),
-            *builder_platform_tools(channel=self.channel, chat_id=self.chat_id),
+            *builder_platform_tools(channel=self.channel, chat_id=self.chat_id, user_id=self.user_id),
             _SearchClawHubTool(), _InstallSkillTool(), _UpdateSkillTool(), _UpdateAllSkillsTool(),
         ]
         attach_skill_runtime(self)

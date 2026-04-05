@@ -25,10 +25,11 @@ class BuilderAgent(BaseAgent):
             ReadFileTool(ws), WriteFileTool(ws), EditFileTool(ws),
             ListDirTool(ws), ShellTool(ws),
             WebSearchTool(), WebFetchTool(),
-            *builder_platform_tools(channel=self.channel, chat_id=self.chat_id),
+            *builder_platform_tools(channel=self.channel, chat_id=self.chat_id, user_id=self.user_id),
         ]
         self.system_prompt += (
             " For fast website prototypes, prefer Loveable build links. "
-            "For managed full-stack scaffolding and deployment, prefer Base44 CLI tools."
+            "For managed full-stack scaffolding and deployment, prefer Base44 CLI tools. "
+            "If the user shares Loveable login credentials, save them with the credential tool before attempting browser-assisted screenshot progress."
         )
         attach_skill_runtime(self)
