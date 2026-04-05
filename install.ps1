@@ -433,6 +433,8 @@ $ProfileDir = Split-Path $PROFILE -Parent
 if (-not (Test-Path $ProfileDir)) { New-Item -ItemType Directory -Force -Path $ProfileDir | Out-Null }
 
 $AliasLine = "function graphclaw { & '$RunPs1' @args }"
+Invoke-Expression $AliasLine
+ok "Loaded 'graphclaw' into the current PowerShell session"
 if (Test-Path $PROFILE) {
     $existing = Get-Content $PROFILE -Raw -ErrorAction SilentlyContinue
     if ($existing -and $existing -match "function graphclaw") {
@@ -475,9 +477,6 @@ Write-Color "         . `$PROFILE" Cyan
 Write-Host ""
 Write-Color "  2. Run graphclaw:" White
 Write-Color "         graphclaw" Cyan
-Write-Host ""
-Write-Color "     Or run directly without reloading:" DarkGray
-Write-Color "         $RunBat" White
 Write-Host ""
 if ($MultiUser -eq "true") {
     Write-Color "  Start as HTTP server:" White
