@@ -6,7 +6,6 @@ Python helper rather than trying to `.spawn()` a walker instance.
 """
 from __future__ import annotations
 
-import asyncio
 from typing import Optional
 
 from graphclaw.agents.base import AgentResult, BaseAgent
@@ -14,15 +13,18 @@ from graphclaw.agents.builder import BuilderAgent
 from graphclaw.agents.devops import DevOpsAgent
 from graphclaw.agents.planner import PlannerAgent
 from graphclaw.agents.researcher import ResearcherAgent
+from graphclaw.config.loader import load_config
 from graphclaw.mcp.tooling import attach_mcp_runtime
 from graphclaw.skills.tooling import attach_skill_runtime
+from graphclaw.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
+from graphclaw.tools.shell import ShellTool
 from graphclaw.tools.web import WebFetchTool, WebSearchTool
 
 
 _AGENT_KEYWORDS = {
     "devops": ("deploy", "infra", "docker", "kubernetes", "k8s", "ci", "cd", "base44", "loveable", "railway", "vercel"),
     "planner": ("plan", "roadmap", "milestone", "priorit", "break down", "todo", "schedule"),
-    "builder": ("code", "implement", "build", "fix", "bug", "refactor", "edit", "write", "test"),
+    "builder": ("code", "implement", "build", "fix", "bug", "refactor", "edit", "write", "test", "terminal", "shell", "command", "bash", "powershell", "zsh", "cli"),
     "researcher": ("research", "search", "find", "look up", "compare", "summarize", "investigate"),
 }
 
@@ -50,6 +52,19 @@ def _identity_prefix(assistant_name: str) -> str:
     )
 
 
+def _default_agent_tools(channel: str, chat_id: str, user_id: str):
+    ws = load_config().workspace
+    return [
+        ReadFileTool(ws),
+        WriteFileTool(ws),
+        EditFileTool(ws),
+        ListDirTool(ws),
+        ShellTool(ws),
+        WebSearchTool(),
+        WebFetchTool(),
+    ]
+
+
 async def run_coordinator(
     query: str,
     channel: str = "cli",
@@ -65,9 +80,10 @@ async def run_coordinator(
         agent.system_prompt = (
             prefix + " " +
             "You are a helpful multi-agent AI assistant. "
-            "Answer directly and clearly. Use tools when helpful, and be honest about uncertainty."
+            "Answer directly and clearly. Use tools when helpful, and be honest about uncertainty. "
+            "You can inspect files, edit workspace files, and execute terminal commands when the task calls for it."
         )
-        agent.tools = [WebSearchTool(), WebFetchTool()]
+        agent.tools = _default_agent_tools(channel=channel, chat_id=chat_id, user_id=user_id)
         attach_skill_runtime(agent)
         attach_mcp_runtime(agent)
     else:
