@@ -110,3 +110,30 @@ def test_dashboard_overview_reports_skill_and_identity_state(monkeypatch, tmp_pa
     memory = dashboard.dashboard_memory()
     assert memory.core_node_labels
     assert memory.core_edge_count >= 4
+
+
+def test_renaming_assistant_updates_seeded_graph_nodes(monkeypatch, tmp_path):
+    config_path = _write_config(tmp_path)
+    monkeypatch.setenv('GRAPHCLAW_CONFIG_PATH', str(config_path))
+    monkeypatch.setenv('GRAPHCLAW_HOME', str(tmp_path / '.graphclaw-home'))
+
+    importlib.reload(loader_mod)
+    backend = importlib.reload(backend_mod)
+    dashboard = importlib.reload(dashboard_mod)
+
+    backend.set_assistant_name('Jet Black Cat')
+
+    profile = backend.get_profile()
+    memories = backend._load_memories()
+    root = next(memory for memory in memories if memory.get('system_key') == 'assistant_root')
+    name_node = next(memory for memory in memories if memory.get('system_key') == 'assistant_name')
+
+    assert profile['assistant_name'] == 'Jet Black Cat'
+    assert profile['display_name'] == 'Jet Black Cat'
+    assert root['content'] == 'Jet Black Cat root node'
+    assert name_node['content'] == 'Name: Jet Black Cat'
+
+    memory = dashboard.dashboard_memory()
+    labels = {node.label for node in memory.nodes}
+    assert 'Jet Black Cat root node' in labels
+    assert 'Name: Jet Black Cat' in labels

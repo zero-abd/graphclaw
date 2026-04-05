@@ -671,7 +671,9 @@ def set_assistant_name(name: str) -> str:
     profile = get_profile()
     profile.setdefault("created_at", _now())
     profile["assistant_name"] = cleaned
+    profile["display_name"] = cleaned
     _save_json(_profile_path(), profile)
+    _ensure_core_memory_graph(_workspace())
     return cleaned
 
 
