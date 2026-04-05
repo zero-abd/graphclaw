@@ -6,9 +6,9 @@ build-backend = "hatchling.build"
 name = "graphclaw"
 version = "0.1.0"
 description = "Graph-native multi-agent AI platform"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.14"
 dependencies = [
-    "jaclang>=0.7.0",
+    "jaclang>=0.6.1",
     "litellm>=1.40.0",
     "pydantic>=2.0.0",
     "aiohttp>=3.10.0",
@@ -22,8 +22,6 @@ channels = [
     "discord.py>=2.4.0",
     "slack-bolt>=1.21.0",
 ]
-
-[project.optional-dependencies]
 dev = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0"]
 
 [tool.hatch.build.targets.wheel]
