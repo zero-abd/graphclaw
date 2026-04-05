@@ -690,19 +690,77 @@ def extract_assistant_name_change(text: str) -> str | None:
             return set_assistant_name(match.group(1))
     return None
 
-def upsert_profile(display_name: str = "", timezone_name: str = "UTC", preferred_model: str = "") -> Dict[str, Any]:
+
+def apply_profile_updates(
+    *,
+    display_name: str = "",
+    identity: str = "",
+    soul: str = "",
+    cadence: str = "",
+    timezone_name: str = "",
+    preferred_model: str = "",
+) -> Dict[str, Any]:
     profile = _load_json(_profile_path(), {})
     if not isinstance(profile, dict):
         profile = {}
     profile.setdefault("created_at", _now())
     if display_name:
+        profile["assistant_name"] = display_name
         profile["display_name"] = display_name
+    if identity:
+        profile["identity"] = identity.strip()
+    if soul:
+        profile["soul"] = soul.strip()
+    if cadence:
+        profile["cadence"] = cadence.strip()
     if timezone_name:
         profile["timezone"] = timezone_name
     if preferred_model:
         profile["preferred_model"] = preferred_model
     _save_json(_profile_path(), profile)
+    _ensure_core_memory_graph(_workspace())
     return profile
+
+
+def extract_profile_updates(text: str) -> Dict[str, str]:
+    updates: Dict[str, str] = {}
+    patterns = {
+        "display_name": [
+            r"(?:from now on[, ]*)?your name is ([A-Za-z0-9 _.-]{1,40})",
+            r"go by ([A-Za-z0-9 _.-]{1,40})",
+            r"i(?:'| a)?ll call you ([A-Za-z0-9 _.-]{1,40})",
+            r"call yourself ([A-Za-z0-9 _.-]{1,40})",
+        ],
+        "identity": [
+            r"(?:your|ur)\s+identity\s+is\s+(.+?)(?:\s+and\s+(?:your|ur)\s+(?:soul|cadence)\s+is\s+.+)?$",
+        ],
+        "soul": [
+            r"(?:your|ur)\s+soul\s+is\s+(.+?)(?:\s+and\s+(?:your|ur)\s+cadence\s+is\s+.+)?$",
+            r"(?:your|ur)\s+vibe\s+is\s+(.+?)(?:\s+and\s+(?:your|ur)\s+cadence\s+is\s+.+)?$",
+        ],
+        "cadence": [
+            r"(?:your|ur)\s+cadence\s+is\s+(.+)",
+        ],
+    }
+    for key, candidates in patterns.items():
+        for pattern in candidates:
+            match = re.search(pattern, text.strip(), flags=re.IGNORECASE)
+            if not match:
+                continue
+            value = re.sub(r"\s+", " ", match.group(1)).strip().strip("\"'")
+            if value:
+                updates[key] = value
+                break
+    if updates:
+        apply_profile_updates(**updates)
+    return updates
+
+def upsert_profile(display_name: str = "", timezone_name: str = "UTC", preferred_model: str = "") -> Dict[str, Any]:
+    return apply_profile_updates(
+        display_name=display_name,
+        timezone_name=timezone_name,
+        preferred_model=preferred_model,
+    )
 
 
 def recall(
