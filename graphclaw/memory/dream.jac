@@ -10,7 +10,7 @@
 
 import from graphclaw.memory.nodes {
     Memory, Topic, Relates, HasMemory, Tagged
-};
+}
 import from graphclaw.memory.consolidate { ConsolidateAll }
 import from datetime { datetime, timezone }
 
