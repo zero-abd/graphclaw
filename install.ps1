@@ -238,7 +238,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 info "Installing graphclaw..."
-$gcOut = & $VenvPip install -e $SourceDir 2>&1
+$gcOut = & $VenvPip install -e "${SourceDir}[channels]" 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Color "  pip output:" DarkGray
     $gcOut | ForEach-Object { Write-Color "    $_" DarkGray }

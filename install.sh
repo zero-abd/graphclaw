@@ -188,7 +188,7 @@ pip install "jaclang>=0.13.5,<0.14" -q 2>/dev/null
 ok "jaclang installed"
 
 info "Installing graphclaw..."
-pip install -e "$SOURCE_DIR" -q 2>/dev/null
+pip install -e "${SOURCE_DIR}[channels]" -q 2>/dev/null
 ok "graphclaw installed"
 
 if command -v jac &>/dev/null; then

@@ -172,7 +172,8 @@ def _reinstall_package() -> None:
     pip_cmd = _pip_path()
     if not pip_cmd.exists():
         raise RuntimeError(f"pip not found at {pip_cmd}")
-    subprocess.run([str(pip_cmd), "install", "-e", str(source_dir()), "-q"], check=True)
+    install_target = f"{source_dir()}[channels]"
+    subprocess.run([str(pip_cmd), "install", "-e", install_target, "-q"], check=True)
 
 
 def perform_update() -> dict[str, Any]:
