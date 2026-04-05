@@ -1,6 +1,7 @@
 """Discord channel integration using discord.py."""
 from __future__ import annotations
 import asyncio
+from pathlib import Path
 import sys
 from graphclaw.channels.bus import bus, InboundMessage, OutboundMessage
 from graphclaw.channels.auth import AuthEvent, ChannelAuthManager
@@ -101,11 +102,18 @@ async def start_discord_channel() -> bool:
                 if channel is None:
                     channel = await client.fetch_channel(int(msg.chat_id))
                 if channel:
-                    # Discord 2000 char limit
+                    files = []
+                    for media_path in msg.media or []:
+                        path = Path(media_path)
+                        if path.exists():
+                            files.append(discord.File(str(path)))
                     text = msg.text
-                    while text:
-                        chunk, text = text[:2000], text[2000:]
-                        await channel.send(chunk)
+                    if files:
+                        await channel.send(content=text[:2000] if text else None, files=files[:10])
+                    else:
+                        while text:
+                            chunk, text = text[:2000], text[2000:]
+                            await channel.send(chunk)
             except Exception as e:
                 print(f"[discord] send error: {e}")
 

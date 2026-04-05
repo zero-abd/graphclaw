@@ -2,7 +2,9 @@
 from __future__ import annotations
 import asyncio
 import logging
+import mimetypes
 import sys
+from pathlib import Path
 from graphclaw.channels.bus import bus, InboundMessage, OutboundMessage
 from graphclaw.channels.auth import AuthEvent, ChannelAuthManager
 from graphclaw.config.loader import load_config
@@ -124,7 +126,29 @@ async def start_telegram_channel() -> bool:
         while True:
             msg: OutboundMessage = await q.get()
             try:
-                await app.bot.send_message(chat_id=msg.chat_id, text=msg.text)
+                caption_sent = False
+                if msg.text:
+                    await app.bot.send_message(chat_id=msg.chat_id, text=msg.text)
+                    caption_sent = True
+                for media_path in msg.media or []:
+                    path = Path(media_path)
+                    if not path.exists():
+                        continue
+                    mime, _ = mimetypes.guess_type(str(path))
+                    with path.open("rb") as handle:
+                        if mime and mime.startswith("image/"):
+                            await app.bot.send_photo(
+                                chat_id=msg.chat_id,
+                                photo=handle,
+                                caption=None if caption_sent else msg.text,
+                            )
+                        else:
+                            await app.bot.send_document(
+                                chat_id=msg.chat_id,
+                                document=handle,
+                                caption=None if caption_sent else msg.text,
+                            )
+                    caption_sent = True
             except Exception as e:
                 print(f"[telegram] send error: {e}")
 
