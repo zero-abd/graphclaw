@@ -8,18 +8,70 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
+if [ -z "${BASH_VERSION:-}" ]; then
+    echo "Graphclaw's Unix installer must be run with bash."
+    echo "Try: bash install.sh"
+    exit 1
+fi
+
 # ── Colors ────────────────────────────────────────────────────────────────────
-R='\033[0;31m'; G='\033[0;32m'; Y='\033[1;33m'; C='\033[0;36m'
-W='\033[1;37m'; D='\033[2m'; NC='\033[0m'; BOLD='\033[1m'
+if [ -t 1 ]; then
+    R=$'\033[0;31m'; G=$'\033[0;32m'; Y=$'\033[1;33m'; C=$'\033[0;36m'
+    W=$'\033[1;37m'; D=$'\033[2m'; NC=$'\033[0m'; BOLD=$'\033[1m'
+else
+    R=''; G=''; Y=''; C=''; W=''; D=''; NC=''; BOLD=''
+fi
+
+supports_unicode=true
+if [ "${LC_ALL:-${LANG:-}}" = "C" ]; then
+    supports_unicode=false
+fi
+
+if [ "$supports_unicode" = true ]; then
+    HR="─"
+    BOX_TL="╭"; BOX_TR="╮"; BOX_BL="╰"; BOX_BR="╯"; BOX_V="│"
+    OK_ICON="✓"; WARN_ICON="⚠"; FAIL_ICON="✗"; ASK_ICON="?"
+else
+    HR="-"
+    BOX_TL="+"; BOX_TR="+"; BOX_BL="+"; BOX_BR="+"; BOX_V="|"
+    OK_ICON="OK"; WARN_ICON="!"; FAIL_ICON="X"; ASK_ICON="?"
+fi
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 step_n=0; total_steps=6
-step() { step_n=$((step_n + 1)); echo ""; echo -e "${BOLD}${W}  [$step_n/$total_steps] $1${NC}"; echo -e "  ${D}$(printf '%.0s─' $(seq 1 60))${NC}"; }
-ok()   { echo -e "  ${G}✓${NC} $1"; }
-warn() { echo -e "  ${Y}⚠${NC}  $1"; }
-fail() { echo -e "  ${R}✗${NC} $1"; exit 1; }
-info() { echo -e "  ${D}$1${NC}"; }
-hint() { echo -e "  ${D}    ↳ $1${NC}"; }
+rule() {
+    local count="${1:-68}" out="" i
+    for ((i = 0; i < count; i++)); do out="${out}${HR}"; done
+    printf '%s' "$out"
+}
+print_box() {
+    local width=66
+    printf "%b%s%s%s%b\n" "$C$BOLD" "$BOX_TL" "$(rule "$width")" "$BOX_TR" "$NC"
+    while IFS= read -r line; do
+        printf "%b%s %-66s %s%b\n" "$C$BOLD" "$BOX_V" "$line" "$BOX_V" "$NC"
+    done <<EOF
+$1
+EOF
+    printf "%b%s%s%s%b\n" "$C$BOLD" "$BOX_BL" "$(rule "$width")" "$BOX_BR" "$NC"
+}
+section_intro() {
+    printf "\n%b  [%s/%s] %s%b\n" "$W$BOLD" "$step_n" "$total_steps" "$1" "$NC"
+    printf "  %b%s%b\n" "$D" "$(rule 60)" "$NC"
+}
+step() { step_n=$((step_n + 1)); section_intro "$1"; }
+ok()   { printf "  %b%s%b %s\n" "$G" "$OK_ICON" "$NC" "$1"; }
+warn() { printf "  %b%s%b %s\n" "$Y" "$WARN_ICON" "$NC" "$1"; }
+fail() { printf "  %b%s%b %s\n" "$R" "$FAIL_ICON" "$NC" "$1"; exit 1; }
+info() { printf "  %b%s%b\n" "$D" "$1" "$NC"; }
+hint() { printf "    %b↳%b %s\n" "$D" "$NC" "$1"; }
+choice_card() {
+    local key="$1" title="$2" desc="$3" badge="${4:-}"
+    if [ -n "$badge" ]; then
+        printf "    %b%s)%b %b%-16s%b %b— %s%b %b[%s]%b\n" "$W" "$key" "$NC" "$BOLD" "$title" "$NC" "$D" "$desc" "$NC" "$G" "$badge" "$NC"
+    else
+        printf "    %b%s)%b %b%-16s%b %b— %s%b\n" "$W" "$key" "$NC" "$BOLD" "$title" "$NC" "$D" "$desc" "$NC"
+    fi
+}
 
 ask_optional() {
     REPLY=""
@@ -36,7 +88,7 @@ ask_required() {
             fail "Input aborted."
         fi
         [ -n "$REPLY" ] && return
-        echo -e "  ${R}  Required — please enter a value.${NC}"
+        printf "  %bRequired — please enter a value.%b\n" "$R" "$NC"
     done
 }
 ask_choice() {
@@ -50,23 +102,21 @@ ask_choice() {
         fi
         REPLY="${answer:-$default}"
         for v in $valid; do [ "$REPLY" = "$v" ] && return; done
-        echo -e "  ${R}  Invalid — enter one of: ${valid}${NC}"
+        printf "  %bInvalid — enter one of: %s%b\n" "$R" "$valid" "$NC"
     done
 }
 
 # ── Banner ────────────────────────────────────────────────────────────────────
-clear 2>/dev/null || true
-echo ""
-echo -e "${C}${BOLD}"
-cat << 'BANNER'
-  +===========================================================+
-  |                                                           |
-  |    GRAPHCLAW                              v0.1.0          |
-  |    Graph-native multi-agent AI platform in Jac            |
-  |                                                           |
-  +===========================================================+
-BANNER
-echo -e "${NC}"
+if [ -t 1 ]; then
+    clear 2>/dev/null || true
+fi
+printf "\n"
+print_box "$(cat <<'EOF'
+GRAPHCLAW
+Graph-native multi-agent AI platform in Jac
+Interactive setup for macOS, Linux, and WSL
+EOF
+)"
 
 # ── Detect OS ────────────────────────────────────────────────────────────────
 OS="$(uname -s 2>/dev/null || echo "unknown")"
@@ -79,9 +129,10 @@ esac
 
 if [ "$PLATFORM" = "windows-bash" ]; then
     warn "Detected Windows (Git Bash). For best experience use PowerShell:"
-    echo -e "       ${W}.\\install.ps1${NC}"
-    echo ""
+    printf "       %b.\\\\install.ps1%b\n\n" "$W" "$NC"
 fi
+
+info "This guided setup installs Graphclaw, prepares your workspace, configures your default model, and helps you enable your first live interface."
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STEP 1 — Python
@@ -202,7 +253,8 @@ pip install -e "${SOURCE_DIR}[channels]" -q 2>/dev/null
 ok "graphclaw installed"
 
 if command -v jac &>/dev/null; then
-    ok "jac CLI ready — ${D}$(jac --version 2>&1 | head -1)${NC}"
+    ok "jac CLI ready"
+    hint "$(jac --version 2>&1 | head -1)"
 else
     warn "jac not found — this shouldn't happen inside the venv"
 fi
@@ -214,11 +266,11 @@ deactivate 2>/dev/null || true
 # ─────────────────────────────────────────────────────────────────────────────
 step "Deployment mode"
 
-echo -e "  ${D}How will you run Graphclaw?${NC}"
-echo ""
-echo -e "    ${W}1)${NC} ${BOLD}Single-user${NC}   ${D}— personal agent, no auth  ${G}(best for most users)${NC}"
-echo -e "    ${W}2)${NC} ${BOLD}Multi-user${NC}    ${D}— hosted server, JWT auth, per-user memory${NC}"
-echo ""
+info "Choose how Graphclaw should run."
+printf "\n"
+choice_card "1" "Single-user" "personal agent, no auth" "Recommended"
+choice_card "2" "Multi-user" "hosted server, JWT auth, per-user memory"
+printf "\n"
 ask_choice "Select mode [1/2]" "1 2" "1"
 MODE_CHOICE="$REPLY"
 
@@ -242,14 +294,14 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 step "LLM provider & channels"
 
-echo -e "  ${D}Choose your default LLM provider:${NC}"
-echo ""
-echo -e "    ${W}1)${NC} ${BOLD}OpenRouter${NC}   ${D}— one key, route models like Claude through OpenRouter  ${G}(recommended)${NC}"
-echo -e "    ${W}2)${NC} ${BOLD}Anthropic${NC}    ${D}— Claude direct${NC}"
-echo -e "    ${W}3)${NC} ${BOLD}OpenAI${NC}       ${D}— GPT-4o / GPT-4.1${NC}"
-echo -e "    ${W}4)${NC} ${BOLD}Ollama${NC}       ${D}— local models, no API key needed${NC}"
-echo -e "    ${W}5)${NC} ${BOLD}Skip${NC}         ${D}— configure manually later${NC}"
-echo ""
+info "Choose your default LLM provider."
+printf "\n"
+choice_card "1" "OpenRouter" "one key, route Claude and many other models through OpenRouter" "Recommended"
+choice_card "2" "Anthropic" "Claude direct"
+choice_card "3" "OpenAI" "GPT-4o / GPT-4.1 direct"
+choice_card "4" "Ollama" "local models, no API key needed"
+choice_card "5" "Skip" "configure manually later"
+printf "\n"
 ask_choice "Select provider [1-5]" "1 2 3 4 5" "1"
 PROVIDER_CHOICE="$REPLY"
 
@@ -313,15 +365,15 @@ case "$PROVIDER_CHOICE" in
         ;;
 esac
 
-echo ""
-echo -e "  ${D}Pick the first chat interface you want to set up:${NC}"
-echo -e "  ${D}You can add more later by re-running install.sh or editing ~/.graphclaw/config.json.${NC}"
-echo ""
-echo -e "    ${W}1)${NC} ${BOLD}Telegram${NC}   ${D}— easiest for personal use${NC}"
-echo -e "    ${W}2)${NC} ${BOLD}Discord${NC}    ${D}— best for servers / communities${NC}"
-echo -e "    ${W}3)${NC} ${BOLD}Slack${NC}      ${D}— best for internal teams${NC}"
-echo -e "    ${W}4)${NC} ${BOLD}Skip for now${NC} ${D}— configure later${NC}"
-echo ""
+printf "\n"
+info "Pick the first chat interface you want to set up."
+info "You can add more later by re-running install.sh or editing ~/.graphclaw/config.json."
+printf "\n"
+choice_card "1" "Telegram" "easiest for personal use"
+choice_card "2" "Discord" "best for servers / communities"
+choice_card "3" "Slack" "best for internal teams"
+choice_card "4" "Skip for now" "configure later"
+printf "\n"
 ask_choice "Select first chat interface [1-4]" "1 2 3 4" "1"
 CHANNEL_CHOICE="$REPLY"
 
@@ -419,7 +471,7 @@ esac
 echo ""
 echo -e "  ${D}Dev tool integrations:${NC}"
 echo ""
-hint "Base44 uses the official Base44 CLI flow. On first use, Graphclaw can call `base44` (or `npx --yes base44@latest`) and you may be prompted to log in."
+hint "Base44 uses the official Base44 CLI flow. On first use, Graphclaw can call 'base44' (or 'npx --yes base44@latest') and you may be prompted to log in."
 hint "Loveable uses official Build with URL links, so no API key is required for the fast website-generation flow."
 hint "If you want screenshot progress updates, Graphclaw will install a Playwright Chromium browser runtime on first use."
 BASE44_KEY=""
@@ -646,16 +698,12 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 # Done
 # ─────────────────────────────────────────────────────────────────────────────
-echo ""
-echo -e "${G}${BOLD}"
-cat << 'DONE'
-  +===========================================================+
-  |                                                           |
-  |   [OK]  Graphclaw installed successfully!                 |
-  |                                                           |
-  +===========================================================+
-DONE
-echo -e "${NC}"
+printf "\n"
+print_box "$(cat <<'EOF'
+INSTALL COMPLETE
+Graphclaw is installed successfully.
+EOF
+)"
 
 echo -e "  ${BOLD}${W}Configuration${NC}"
 echo -e "  ${D}──────────────────────────────────────────${NC}"
@@ -668,12 +716,14 @@ echo ""
 
 echo -e "  ${BOLD}${W}Next steps${NC}"
 echo -e "  ${D}──────────────────────────────────────────${NC}"
+next_step=1
 if [ -n "$SHELL_RC" ]; then
-    echo -e "  ${Y}1. Reload your shell (required once):${NC}"
+    echo -e "  ${Y}${next_step}. Reload your shell (required once):${NC}"
     echo -e "       ${W}source $SHELL_RC${NC}"
     echo ""
+    next_step=$((next_step + 1))
 fi
-echo -e "  ${W}2. Start graphclaw:${NC}"
+echo -e "  ${W}${next_step}. Start graphclaw:${NC}"
 echo -e "       ${W}graphclaw${NC}"
 echo ""
 echo -e "  ${D}Later, manage updates safely with:${NC}"
