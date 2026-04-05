@@ -270,7 +270,7 @@ $ConfigJson = @"
     "secret_key": "$JwtSecret"
   },
   "skills": {
-    "registry_url": "https://raw.githubusercontent.com/zero-abd/skills-registry/main/index.json",
+    "registry_url": "https://clawhub.ai/api/v1",
     "installed_path": "$($GraphclawDir -replace '\\','\\')\\skills\\installed"
   }
 }

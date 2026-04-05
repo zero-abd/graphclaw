@@ -368,7 +368,7 @@ cat > "$CONFIG_FILE" << EOF
     "secret_key": "$JWT_SECRET"
   },
   "skills": {
-    "registry_url": "https://raw.githubusercontent.com/zero-abd/skills-registry/main/index.json",
+    "registry_url": "https://clawhub.ai/api/v1",
     "installed_path": "$GRAPHCLAW_DIR/skills/installed"
   }
 }

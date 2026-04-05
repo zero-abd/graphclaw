@@ -152,8 +152,9 @@ agent.recall("deployment strategy", semantic=True)   # + LLM semantic check
 
 ## Skills
 
-Each skill is a directory:
+Graphclaw supports two skill types:
 
+**Native skills** — `skill.json` manifest + `skill.py` Python tools (fast, typed):
 ```
 skills/registry/
 └── base44/
@@ -161,29 +162,37 @@ skills/registry/
     └── skill.py      ← async Python tool functions
 ```
 
+**ClawHub skills** — `SKILL.md` with YAML frontmatter + markdown instructions (13k+ in registry):
+```
+~/.graphclaw/skills/installed/kubernetes/
+└── SKILL.md          ← frontmatter metadata + step-by-step instructions
+```
+The DevOps agent reads the instructions and executes them using its built-in shell, web, and file tools — the same way OpenClaw runs skills, but via Graphclaw's Python ShellTool instead of a Node.js exec host.
+
 **Built-in skills:** `base44`, `loveable`
 
-**Install a skill online:**
+**Install a skill from ClawHub (13,000+ skills):**
 ```
 > install the kubernetes skill
-[devops] Installing skill 'kubernetes' from registry...
-✓ Skill installed — tools: apply_manifest, get_pods, scale_deployment, get_logs...
+[devops] Searching ClawHub for 'kubernetes'...
+[devops] Downloading and installing 'kubernetes' from clawhub.ai...
+✓ Skill installed — call clawhub__kubernetes to use it
 ```
 
-Or directly:
+Or directly from the Jac graph:
 ```python
-InstallSkill(source="kubernetes") spawn root
-InstallSkill(source="https://github.com/myorg/skills-registry") spawn root
+InstallSkill(source="kubernetes") spawn root         # ClawHub slug
+InstallSkill(source="https://github.com/org/r.zip") spawn root  # direct ZIP URL
 ```
 
 **Skills the DevOps agent can tap into:**
 
-| Skill | Tools |
-|---|---|
-| `base44` | `deploy_app`, `get_build_logs`, `get_app_status`, `update_env_vars`, `restart_app`, `rollback_app` |
-| `loveable` | `create_project`, `publish_project`, `send_prompt`, `get_project_status`, `get_chat_history` |
-| `kubernetes` *(install)* | `apply_manifest`, `get_pods`, `scale_deployment`, `get_logs` |
-| *any GitHub repo* | whatever it exports |
+| Skill | Type | Invocation |
+|---|---|---|
+| `base44` | native | `base44__deploy_app`, `base44__get_build_logs`, `base44__restart_app`, … |
+| `loveable` | native | `loveable__create_project`, `loveable__send_prompt`, … |
+| `kubernetes` *(clawhub)* | ClawHub | `clawhub__kubernetes(task="apply my manifest")` |
+| *any clawhub slug* | ClawHub | `clawhub__<slug>(task="...")` |
 
 ---
 
@@ -260,7 +269,7 @@ Full config at `~/.graphclaw/config.json`. Key fields:
     }
   },
   "skills": {
-    "registry_url": "https://raw.githubusercontent.com/zero-abd/skills-registry/main/index.json"
+    "registry_url": "https://clawhub.ai/api/v1"
   }
 }
 ```
@@ -316,7 +325,7 @@ graphclaw/
 ## Roadmap
 
 - [ ] CLI (`graphclaw run`, `graphclaw skill install`, `graphclaw memory`)
-- [ ] `zero-abd/skills-registry` — public community skill repository
+- [x] ClawHub integration — 13,000+ public community skills available via `clawhub.ai`
 - [ ] More DevOps skills: Kubernetes, Docker, GitHub Actions, Vercel, Railway, AWS
 - [ ] Streaming output to channels
 - [ ] Web UI (Jac `cl {}` codespace — React frontend auto-generated)
