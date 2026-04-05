@@ -19,7 +19,7 @@ def test_dashboard_app_project_files_exist():
     project_root = REPO_ROOT / 'graphclaw' / 'dashboard_app'
     assert (project_root / 'jac.toml').exists()
     assert (project_root / 'main.jac').exists()
-    assert (project_root / 'main.cl.jac').exists()
+    assert (project_root / 'app.cl.jac').exists()
 
 
 def test_with_repo_on_pythonpath_prepends_repo_root(monkeypatch):
