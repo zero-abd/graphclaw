@@ -91,20 +91,42 @@ function Step {
 
 Step "Checking Python"
 
+# Known install locations winget uses for Python 3.13
+$Python313Paths = @(
+    "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe",
+    "$env:ProgramFiles\Python313\python.exe",
+    "$env:ProgramFiles\Python\Python313\python.exe"
+)
+
+function Test-PythonVersion {
+    param([string]$Exe)
+    try {
+        $ver = & $Exe -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
+        if ($ver -match '^\d+\.\d+$') {
+            $parts = $ver.Split(".")
+            $maj = [int]$parts[0]; $min = [int]$parts[1]
+            if ($maj -eq 3 -and $min -ge 12 -and $min -le 13) { return $true }
+        }
+    } catch { }
+    return $false
+}
+
 function Find-Python {
+    # First check known 3.13 install paths directly (bypasses PATH ordering)
+    foreach ($p in $Python313Paths) {
+        if ((Test-Path $p) -and (Test-PythonVersion $p)) { return $p }
+    }
+    # Then check PATH, skipping 3.14+
     foreach ($cmd in @("python3.13","python3.12","python3","python","py")) {
         $found = Get-Command $cmd -ErrorAction SilentlyContinue
         if ($found) {
+            $exe = $found.Source
+            if (Test-PythonVersion $exe) { return $exe }
+            # Detect unsupported version for warning
             try {
-                $ver = & $cmd -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
-                if ($ver -match '^\d+\.\d+$') {
-                    $parts = $ver.Split(".")
-                    $maj = [int]$parts[0]; $min = [int]$parts[1]
-                    # Accept 3.12 and 3.13 only -- 3.14+ has venv bugs and jaclang doesn't support it yet
-                    if ($maj -eq 3 -and $min -ge 12 -and $min -le 13) { return $cmd }
-                    if ($maj -eq 3 -and $min -ge 14) {
-                        warn "Python $ver detected but 3.14+ is not yet supported (venv bugs, jaclang incompatible). Will install 3.13."
-                    }
+                $ver = & $exe -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>$null
+                if ($ver -match '^3\.1[4-9]') {
+                    warn "Python $ver found but 3.14+ is not supported yet (jaclang incompatible). Skipping."
                 }
             } catch { }
         }
@@ -120,19 +142,19 @@ if (-not $Python) {
     if ($winget) {
         winget install --id Python.Python.3.13 --source winget --silent --accept-package-agreements --accept-source-agreements
         if ($LASTEXITCODE -eq 0) {
-            # Refresh PATH so the new python is visible
+            ok "Python 3.13 installed"
+            # Refresh PATH then check known paths
             $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH","User")
             $Python = Find-Python
         }
     }
     if (-not $Python) {
         Write-Host ""
-        Write-Color "  Python 3.13 could not be installed automatically." Red
-        Write-Color "  Please install it manually from: https://python.org/downloads/release/python-3130/" Yellow
-        Write-Color "  Make sure to check 'Add python.exe to PATH' during installation." Yellow
-        exit 1
+        Write-Color "  Python 3.13 was installed but this terminal cannot find it yet." Yellow
+        Write-Color "  Please close this window and run the installer again in a new terminal:" White
+        Write-Color "      irm https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.ps1 | iex" Cyan
+        exit 0
     }
-    ok "Python 3.13 installed via winget"
 }
 
 $pyVer = & $Python --version 2>&1
