@@ -177,29 +177,32 @@ ok "Using $pyVer"
 
 Step "Locating source"
 
-$ScriptDir = $null
-try { $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path } catch {}
-$CloneDir = "$env:TEMP\graphclaw"
-
-if (-not $ScriptDir -or -not (Test-Path "$ScriptDir\pyproject.toml" -ErrorAction SilentlyContinue)) {
-    info "Cloning graphclaw repository..."
-    if (Get-Command git -ErrorAction SilentlyContinue) {
-        if (Test-Path $CloneDir) { Remove-Item -Recurse -Force $CloneDir }
-        git clone --depth 1 https://github.com/zero-abd/graphclaw $CloneDir -q 2>$null
-        ok "Cloned to $CloneDir"
-        $ScriptDir = $CloneDir
-    } else {
-        fail "git is required. Install from https://git-scm.com and retry."
-    }
-} else {
-    ok "Using source at $ScriptDir"
-}
-
 $GraphclawDir = "$env:USERPROFILE\.graphclaw"
 $WorkspaceDir = "$GraphclawDir\workspace"
 $ConfigFile   = "$GraphclawDir\config.json"
 $EnvFile      = "$GraphclawDir\.env"
 $VenvDir      = "$GraphclawDir\venv"
+$SourceDir    = "$GraphclawDir\source"
+
+$ScriptDir = $null
+try { $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path } catch {}
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    fail "git is required. Install from https://git-scm.com and retry."
+}
+
+if (Test-Path "$SourceDir\.git") {
+    ok "Using managed source at $SourceDir"
+} elseif ($ScriptDir -and (Test-Path "$ScriptDir\pyproject.toml" -ErrorAction SilentlyContinue) -and (Test-Path "$ScriptDir\.git" -ErrorAction SilentlyContinue)) {
+    info "Creating managed source copy..."
+    if (Test-Path $SourceDir) { Remove-Item -Recurse -Force $SourceDir }
+    git clone --quiet $ScriptDir $SourceDir 2>$null
+    ok "Managed source created at $SourceDir"
+} else {
+    info "Cloning graphclaw repository..."
+    if (Test-Path $SourceDir) { Remove-Item -Recurse -Force $SourceDir }
+    git clone --depth 1 https://github.com/zero-abd/graphclaw $SourceDir -q 2>$null
+    ok "Cloned managed source to $SourceDir"
+}
 
 New-Item -ItemType Directory -Force -Path "$WorkspaceDir\memory" | Out-Null
 New-Item -ItemType Directory -Force -Path "$WorkspaceDir\sessions" | Out-Null
@@ -235,7 +238,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 info "Installing graphclaw..."
-$gcOut = & $VenvPip install -e $ScriptDir 2>&1
+$gcOut = & $VenvPip install -e $SourceDir 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Color "  pip output:" DarkGray
     $gcOut | ForEach-Object { Write-Color "    $_" DarkGray }
@@ -333,21 +336,66 @@ switch ($ProviderChoice) {
 }
 
 Write-Host ""
-Write-Color "  Messaging channels (all optional -- skip any by pressing Enter):" DarkGray
+Write-Color "  Pick the first chat interface you want to set up:" DarkGray
+Write-Color "  You can add more later by re-running install.ps1 or editing ~/.graphclaw/config.json." DarkGray
+Write-Host ""
+Write-Color "    1)  Telegram   -- easiest for personal use" White
+Write-Color "    2)  Discord    -- best for servers / communities" White
+Write-Color "    3)  Slack      -- best for internal teams" White
+Write-Color "    4)  Skip for now -- configure later" White
 Write-Host ""
 
-hint "Telegram: open Telegram, message @BotFather, send /newbot"
-$TgToken = ask_optional "Telegram bot token"
+$ChannelChoice = ask_choice "Select first chat interface [1-4]" @("1","2","3","4") "1"
+$TgToken = ""; $DcToken = ""; $SlBotToken = ""; $SlAppToken = ""
 
-hint "Discord: discord.com/developers/applications -> New App -> Bot -> Reset Token"
-$DcToken = ask_optional "Discord bot token"
+function Configure-Telegram {
+    Write-Host ""
+    Write-Color "  Telegram setup walkthrough" White
+    hint "Open BotFather: https://t.me/BotFather"
+    hint "1. Send /newbot"
+    hint "2. Choose a display name for your bot"
+    hint "3. Choose a unique username ending in 'bot'"
+    hint "4. Copy the token BotFather gives you"
+    hint "5. Start a chat with your bot so it can message you back"
+    $script:TgToken = ask_optional "Paste Telegram bot token"
+    if ($script:TgToken) { ok "Telegram configured" }
+}
 
-hint "Slack: api.slack.com/apps -> Create App -> OAuth & Permissions -> Bot Token"
-$SlBotToken = ask_optional "Slack bot token (xoxb-...)"
-$SlAppToken = ""
-if ($SlBotToken) {
-    hint "Slack app token: api.slack.com/apps -> Your App -> Basic Information -> App-Level Tokens"
-    $SlAppToken = ask_required "Slack app token (xapp-...)"
+function Configure-Discord {
+    Write-Host ""
+    Write-Color "  Discord setup walkthrough" White
+    hint "Open Discord Developer Portal: https://discord.com/developers/applications"
+    hint "1. Click New Application"
+    hint "2. Open the Bot tab and click Add Bot"
+    hint "3. Reset / copy the bot token"
+    hint "4. In Bot settings, enable Message Content Intent"
+    hint "5. In OAuth2 -> URL Generator, select 'bot' scope and invite the bot to your server"
+    $script:DcToken = ask_optional "Paste Discord bot token"
+    if ($script:DcToken) { ok "Discord configured" }
+}
+
+function Configure-Slack {
+    Write-Host ""
+    Write-Color "  Slack setup walkthrough" White
+    hint "Open Slack app builder: https://api.slack.com/apps"
+    hint "1. Click Create New App"
+    hint "2. Add a bot user under App Home"
+    hint "3. In OAuth & Permissions, install the app and copy the Bot User OAuth Token (xoxb-...)"
+    hint "4. Enable Socket Mode"
+    hint "5. In Basic Information -> App-Level Tokens, create a token with connections:write (xapp-...)"
+    hint "6. Invite the bot to the channel you want to use"
+    $script:SlBotToken = ask_optional "Paste Slack bot token (xoxb-...)"
+    if ($script:SlBotToken) {
+        $script:SlAppToken = ask_required "Paste Slack app token (xapp-...)"
+        ok "Slack configured"
+    }
+}
+
+switch ($ChannelChoice) {
+    "1" { Configure-Telegram }
+    "2" { Configure-Discord }
+    "3" { Configure-Slack }
+    "4" { ok "Skipped messaging channels for now -- add one later in ~/.graphclaw/config.json or by re-running install.ps1" }
 }
 
 Write-Host ""
@@ -364,67 +412,192 @@ $LoveableKey = ask_optional "Loveable API key"
 
 Step "Writing config & shell integration"
 
-$tgEnabled = if ($TgToken)    { "true" } else { "false" }
-$dcEnabled = if ($DcToken)    { "true" } else { "false" }
-$slEnabled = if ($SlBotToken) { "true" } else { "false" }
-
-$EscWorkspace = $WorkspaceDir -replace '\\','\\'
-$EscSkillPath = ($GraphclawDir -replace '\\','\\') + "\\skills\\installed"
-
-$ConfigJson = @"
-{
-  "workspace": "$EscWorkspace",
-  "multi_user": $MultiUser,
-  "agents": {
-    "model": "$DefaultModel",
-    "max_tokens": 8192,
-    "temperature": 0.7,
-    "max_tool_iterations": 200,
-    "dream": { "enabled": true, "interval_hours": 2 }
-  },
-  "providers": {
-    "default_provider": "openrouter",
-    "openrouter": { "api_key": "$OpenrouterKey", "base_url": "https://openrouter.ai/api/v1" },
-    "anthropic": { "api_key": "$AnthropicKey" },
-    "openai": { "api_key": "$OpenaiKey" }
-  },
-  "channels": {
-    "telegram": { "enabled": $tgEnabled, "bot_token": "$TgToken" },
-    "discord":  { "enabled": $dcEnabled, "bot_token": "$DcToken" },
-    "slack":    { "enabled": $slEnabled, "bot_token": "$SlBotToken", "app_token": "$SlAppToken" },
-    "email":    { "enabled": false },
-    "whatsapp": { "enabled": false }
-  },
-  "auth": { "enabled": $MultiUser, "secret_key": "$JwtSecret" },
-  "skills": {
-    "registry_url": "https://clawhub.ai/api/v1",
-    "installed_path": "$EscSkillPath"
-  }
+$DefaultProviderKey = "openrouter"
+switch ($ProviderChoice) {
+    "2" { $DefaultProviderKey = "anthropic" }
+    "3" { $DefaultProviderKey = "openai" }
+    "4" { $DefaultProviderKey = "ollama" }
 }
+
+$env:GRAPHCLAW_CONFIG_MERGE_PATH = $ConfigFile
+$env:GRAPHCLAW_WORKSPACE_PATH = $WorkspaceDir
+$env:GRAPHCLAW_INSTALLED_SKILLS = "$GraphclawDir\skills\installed"
+$env:GRAPHCLAW_DEFAULT_MODEL = $DefaultModel
+$env:GRAPHCLAW_DEFAULT_PROVIDER = $DefaultProviderKey
+$env:GRAPHCLAW_MULTI_USER = $MultiUser
+$env:GRAPHCLAW_JWT_SECRET = $JwtSecret
+$env:GRAPHCLAW_OPENROUTER_KEY = $OpenrouterKey
+$env:GRAPHCLAW_ANTHROPIC_KEY = $AnthropicKey
+$env:GRAPHCLAW_OPENAI_KEY = $OpenaiKey
+$env:GRAPHCLAW_TG_TOKEN = $TgToken
+$env:GRAPHCLAW_DC_TOKEN = $DcToken
+$env:GRAPHCLAW_SL_BOT_TOKEN = $SlBotToken
+$env:GRAPHCLAW_SL_APP_TOKEN = $SlAppToken
+
+$ConfigMerge = @"
+import json
+import os
+from pathlib import Path
+
+config_path = Path(os.environ["GRAPHCLAW_CONFIG_MERGE_PATH"])
+existing = {}
+if config_path.exists():
+    try:
+        existing = json.loads(config_path.read_text(encoding="utf-8"))
+    except Exception:
+        existing = {}
+if not isinstance(existing, dict):
+    existing = {}
+
+cfg = existing
+cfg["workspace"] = cfg.get("workspace") or os.environ["GRAPHCLAW_WORKSPACE_PATH"]
+cfg["multi_user"] = os.environ["GRAPHCLAW_MULTI_USER"].lower() == "true"
+
+agents = cfg.setdefault("agents", {})
+agents["model"] = os.environ["GRAPHCLAW_DEFAULT_MODEL"]
+agents.setdefault("max_tokens", 8192)
+agents.setdefault("temperature", 0.7)
+agents.setdefault("max_tool_iterations", 200)
+dream = agents.setdefault("dream", {})
+dream.setdefault("enabled", True)
+dream.setdefault("interval_hours", 2)
+
+providers = cfg.setdefault("providers", {})
+providers["default_provider"] = os.environ["GRAPHCLAW_DEFAULT_PROVIDER"]
+providers.setdefault("openrouter", {"base_url": "https://openrouter.ai/api/v1"})
+providers.setdefault("anthropic", {})
+providers.setdefault("openai", {})
+providers.setdefault("ollama", {"base_url": "http://localhost:11434"})
+if os.environ["GRAPHCLAW_OPENROUTER_KEY"]:
+    providers["openrouter"]["api_key"] = os.environ["GRAPHCLAW_OPENROUTER_KEY"]
+providers["openrouter"].setdefault("base_url", "https://openrouter.ai/api/v1")
+if os.environ["GRAPHCLAW_ANTHROPIC_KEY"]:
+    providers["anthropic"]["api_key"] = os.environ["GRAPHCLAW_ANTHROPIC_KEY"]
+if os.environ["GRAPHCLAW_OPENAI_KEY"]:
+    providers["openai"]["api_key"] = os.environ["GRAPHCLAW_OPENAI_KEY"]
+
+channels = cfg.setdefault("channels", {})
+channels.setdefault("telegram", {"enabled": False, "bot_token": "", "allowed_ids": []})
+channels.setdefault("discord", {"enabled": False, "bot_token": "", "allowed_ids": []})
+channels.setdefault("slack", {"enabled": False, "bot_token": "", "app_token": "", "allowed_ids": []})
+channels.setdefault("email", {"enabled": False})
+channels.setdefault("whatsapp", {"enabled": False})
+if os.environ["GRAPHCLAW_TG_TOKEN"]:
+    channels["telegram"]["enabled"] = True
+    channels["telegram"]["bot_token"] = os.environ["GRAPHCLAW_TG_TOKEN"]
+if os.environ["GRAPHCLAW_DC_TOKEN"]:
+    channels["discord"]["enabled"] = True
+    channels["discord"]["bot_token"] = os.environ["GRAPHCLAW_DC_TOKEN"]
+if os.environ["GRAPHCLAW_SL_BOT_TOKEN"]:
+    channels["slack"]["enabled"] = True
+    channels["slack"]["bot_token"] = os.environ["GRAPHCLAW_SL_BOT_TOKEN"]
+if os.environ["GRAPHCLAW_SL_APP_TOKEN"]:
+    channels["slack"]["app_token"] = os.environ["GRAPHCLAW_SL_APP_TOKEN"]
+
+auth = cfg.setdefault("auth", {})
+auth["enabled"] = os.environ["GRAPHCLAW_MULTI_USER"].lower() == "true"
+if os.environ["GRAPHCLAW_JWT_SECRET"]:
+    auth["secret_key"] = os.environ["GRAPHCLAW_JWT_SECRET"]
+else:
+    auth.setdefault("secret_key", "")
+
+skills = cfg.setdefault("skills", {})
+skills.setdefault("registry_url", "https://clawhub.ai/api/v1")
+skills["installed_path"] = os.environ["GRAPHCLAW_INSTALLED_SKILLS"]
+
+config_path.parent.mkdir(parents=True, exist_ok=True)
+config_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
 "@
-Write-NoBom $ConfigFile $ConfigJson
+& $VenvPython -c $ConfigMerge
+if ($LASTEXITCODE -ne 0) { fail "Failed to write merged config." }
 ok "Config written to $ConfigFile"
 
-# .env — written without BOM so batch/Python can read it cleanly
-$envLines = @("# Graphclaw environment", "GRAPHCLAW_CONFIG_PATH=$ConfigFile")
-if ($OpenrouterKey) { $envLines += "OPENROUTER_API_KEY=$OpenrouterKey" }
-if ($AnthropicKey)  { $envLines += "ANTHROPIC_API_KEY=$AnthropicKey" }
-if ($OpenaiKey)     { $envLines += "OPENAI_API_KEY=$OpenaiKey" }
-if ($Base44Key)     { $envLines += "BASE44_API_KEY=$Base44Key" }
-if ($LoveableKey)   { $envLines += "LOVEABLE_API_KEY=$LoveableKey" }
+$envMap = @{}
+if (Test-Path $EnvFile) {
+    foreach ($line in (Get-Content $EnvFile -ErrorAction SilentlyContinue)) {
+        if (-not $line -or $line.Trim().StartsWith("#") -or -not ($line -match "=")) { continue }
+        $key, $value = $line -split "=", 2
+        $envMap[$key] = $value
+    }
+}
+$envMap["GRAPHCLAW_CONFIG_PATH"] = $ConfigFile
+$envMap["GRAPHCLAW_HOME"] = $GraphclawDir
+if ($OpenrouterKey) { $envMap["OPENROUTER_API_KEY"] = $OpenrouterKey }
+if ($AnthropicKey)  { $envMap["ANTHROPIC_API_KEY"] = $AnthropicKey }
+if ($OpenaiKey)     { $envMap["OPENAI_API_KEY"] = $OpenaiKey }
+if ($Base44Key)     { $envMap["BASE44_API_KEY"] = $Base44Key }
+if ($LoveableKey)   { $envMap["LOVEABLE_API_KEY"] = $LoveableKey }
+$envLines = @("# Graphclaw environment")
+foreach ($key in @("GRAPHCLAW_CONFIG_PATH","GRAPHCLAW_HOME","OPENROUTER_API_KEY","ANTHROPIC_API_KEY","OPENAI_API_KEY","BASE44_API_KEY","LOVEABLE_API_KEY")) {
+    if ($envMap.ContainsKey($key) -and $envMap[$key]) {
+        $envLines += "${key}=$($envMap[$key])"
+    }
+}
 Write-NoBom $EnvFile ($envLines -join "`r`n")
 ok ".env written to $EnvFile"
 
-# run.bat — activates venv, sets config path, runs jac
 $RunBat = "$GraphclawDir\run.bat"
-$MainJac = "$ScriptDir\graphclaw\main.jac"
-$RunBatContent = "@echo off`r`ncall `"$VenvDir\Scripts\activate.bat`"`r`nset GRAPHCLAW_CONFIG_PATH=$ConfigFile`r`njac run --no-autonative `"$MainJac`" %*`r`n"
+$MainJac = "$SourceDir\graphclaw\main.jac"
+$RunBatContent = @"
+@echo off
+call "$VenvDir\Scripts\activate.bat"
+set GRAPHCLAW_CONFIG_PATH=$ConfigFile
+set GRAPHCLAW_HOME=$GraphclawDir
+if /I "%~1"=="update" (
+  shift
+  "$VenvDir\Scripts\python.exe" -m graphclaw.update_manager update %*
+  goto :eof
+)
+if /I "%~1"=="rollback" (
+  shift
+  "$VenvDir\Scripts\python.exe" -m graphclaw.update_manager rollback %*
+  goto :eof
+)
+if /I "%~1"=="status" (
+  shift
+  "$VenvDir\Scripts\python.exe" -m graphclaw.update_manager status %*
+  goto :eof
+)
+jac run --no-autonative "$MainJac" %*
+"@
 Write-NoBom $RunBat $RunBatContent
 ok "Startup script: $RunBat"
 
-# run.ps1 — PowerShell equivalent (activates venv, runs jac)
 $RunPs1 = "$GraphclawDir\run.ps1"
-$RunPs1Content = "& `"$VenvDir\Scripts\Activate.ps1`"`r`n`$env:GRAPHCLAW_CONFIG_PATH = `"$ConfigFile`"`r`njac run --no-autonative `"$MainJac`" @args`r`n"
+$RunPs1Content = @"
+& "$VenvDir\Scripts\Activate.ps1"
+`$env:GRAPHCLAW_CONFIG_PATH = "$ConfigFile"
+`$env:GRAPHCLAW_HOME = "$GraphclawDir"
+if (`$args.Count -gt 0) {
+  switch (`$args[0]) {
+    "update" {
+      if (`$args.Count -gt 1) {
+        & "$VenvDir\Scripts\python.exe" -m graphclaw.update_manager update @(`$args[1..(`$args.Count-1)])
+      } else {
+        & "$VenvDir\Scripts\python.exe" -m graphclaw.update_manager update
+      }
+      return
+    }
+    "rollback" {
+      if (`$args.Count -gt 1) {
+        & "$VenvDir\Scripts\python.exe" -m graphclaw.update_manager rollback @(`$args[1..(`$args.Count-1)])
+      } else {
+        & "$VenvDir\Scripts\python.exe" -m graphclaw.update_manager rollback
+      }
+      return
+    }
+    "status" {
+      if (`$args.Count -gt 1) {
+        & "$VenvDir\Scripts\python.exe" -m graphclaw.update_manager status @(`$args[1..(`$args.Count-1)])
+      } else {
+        & "$VenvDir\Scripts\python.exe" -m graphclaw.update_manager status
+      }
+      return
+    }
+  }
+}
+jac run --no-autonative "$MainJac" @args
+"@
 Write-NoBom $RunPs1 $RunPs1Content
 ok "PowerShell startup: $RunPs1"
 
@@ -477,6 +650,10 @@ Write-Color "         . `$PROFILE" Cyan
 Write-Host ""
 Write-Color "  2. Run graphclaw:" White
 Write-Color "         graphclaw" Cyan
+Write-Host ""
+Write-Color "  Later, manage updates safely with:" DarkGray
+Write-Color "         graphclaw update" White
+Write-Color "         graphclaw rollback" White
 Write-Host ""
 if ($MultiUser -eq "true") {
     Write-Color "  Start as HTTP server:" White

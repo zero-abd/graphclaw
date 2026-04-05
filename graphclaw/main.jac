@@ -108,6 +108,9 @@ def start_dream_scheduler() {
 with entry {
     ::py::
     import asyncio
+    import sys
+
+    from graphclaw.update_manager import maybe_prompt_for_update
 
     cfg = load_config()
     ensure_workspace()
@@ -141,6 +144,12 @@ with entry {
         print("[graphclaw] channels: " + ", ".join(channels_started))
     else:
         print("[graphclaw] no channels enabled -- running in CLI mode")
+        update_prompt = maybe_prompt_for_update()
+        if update_prompt.action == "updated":
+            print(f"[graphclaw] {update_prompt.message}")
+            sys.exit(0)
+        if update_prompt.action == "error":
+            print(f"[graphclaw] Update check failed: {update_prompt.message}")
 
     start_dispatch_loop()
     start_dream_scheduler()

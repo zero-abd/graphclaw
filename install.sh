@@ -135,28 +135,37 @@ ok "Using ${W}$($PYTHON --version 2>&1)${NC}"
 # ─────────────────────────────────────────────────────────────────────────────
 step "Locating source"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
-
-if [ -z "$SCRIPT_DIR" ] || [ "$SCRIPT_DIR" = "/dev/fd" ] || [ ! -f "$SCRIPT_DIR/pyproject.toml" ]; then
-    CLONE_DIR="$(mktemp -d)/graphclaw"
-    info "Running from pipe — cloning graphclaw..."
-    command -v git &>/dev/null || fail "git is required. Install git and retry."
-    git clone --depth 1 https://github.com/zero-abd/graphclaw "$CLONE_DIR" -q
-    ok "Cloned to ${W}$CLONE_DIR${NC}"
-    SCRIPT_DIR="$CLONE_DIR"
-else
-    ok "Using source at ${W}$SCRIPT_DIR${NC}"
-fi
-
 GRAPHCLAW_DIR="$HOME/.graphclaw"
 WORKSPACE_DIR="$GRAPHCLAW_DIR/workspace"
 CONFIG_FILE="$GRAPHCLAW_DIR/config.json"
 VENV_DIR="$GRAPHCLAW_DIR/venv"
+SOURCE_DIR="$GRAPHCLAW_DIR/source"
+ENV_FILE="$GRAPHCLAW_DIR/.env"
+UPDATE_STATE_DIR="$GRAPHCLAW_DIR/state"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo "")"
+
+command -v git &>/dev/null || fail "git is required. Install git and retry."
+
+if [ -d "$SOURCE_DIR/.git" ]; then
+    ok "Using managed source at ${W}$SOURCE_DIR${NC}"
+elif [ -n "$SCRIPT_DIR" ] && [ "$SCRIPT_DIR" != "/dev/fd" ] && [ -f "$SCRIPT_DIR/pyproject.toml" ] && [ -d "$SCRIPT_DIR/.git" ]; then
+    info "Creating managed source copy..."
+    rm -rf "$SOURCE_DIR"
+    git clone --quiet --no-hardlinks "$SCRIPT_DIR" "$SOURCE_DIR"
+    ok "Managed source created at ${W}$SOURCE_DIR${NC}"
+else
+    info "Running from pipe — cloning graphclaw..."
+    rm -rf "$SOURCE_DIR"
+    git clone --depth 1 https://github.com/zero-abd/graphclaw "$SOURCE_DIR" -q
+    ok "Cloned managed source to ${W}$SOURCE_DIR${NC}"
+fi
 
 mkdir -p "$WORKSPACE_DIR/memory" \
          "$WORKSPACE_DIR/sessions" \
          "$WORKSPACE_DIR/skills/installed" \
-         "$GRAPHCLAW_DIR/skills/installed"
+         "$GRAPHCLAW_DIR/skills/installed" \
+         "$UPDATE_STATE_DIR"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STEP 3 — Create venv & install dependencies
@@ -179,7 +188,7 @@ pip install "jaclang>=0.13.5,<0.14" -q 2>/dev/null
 ok "jaclang installed"
 
 info "Installing graphclaw..."
-pip install -e "$SCRIPT_DIR" -q 2>/dev/null
+pip install -e "$SOURCE_DIR" -q 2>/dev/null
 ok "graphclaw installed"
 
 if command -v jac &>/dev/null; then
@@ -273,23 +282,72 @@ case "$PROVIDER_CHOICE" in
 esac
 
 echo ""
-echo -e "  ${D}Messaging channels — all optional, press Enter to skip:${NC}"
+echo -e "  ${D}Pick the first chat interface you want to set up:${NC}"
+echo -e "  ${D}You can add more later by re-running install.sh or editing ~/.graphclaw/config.json.${NC}"
 echo ""
-hint "Telegram: open Telegram, message @BotFather, send /newbot"
-ask_optional "Telegram bot token"
-TG_TOKEN="$REPLY"
-hint "Discord: discord.com/developers/applications → New App → Bot → Reset Token"
-ask_optional "Discord bot token"
-DC_TOKEN="$REPLY"
-hint "Slack: api.slack.com/apps → Create App → OAuth & Permissions → Bot Token"
-ask_optional "Slack bot token (xoxb-...)"
-SL_BOT_TOKEN="$REPLY"
-SL_APP_TOKEN=""
-if [ -n "$SL_BOT_TOKEN" ]; then
-    hint "Slack app token: api.slack.com/apps → Basic Information → App-Level Tokens"
-    ask_required "Slack app token (xapp-...)"
-    SL_APP_TOKEN="$REPLY"
-fi
+echo -e "    ${W}1)${NC} ${BOLD}Telegram${NC}   ${D}— easiest for personal use${NC}"
+echo -e "    ${W}2)${NC} ${BOLD}Discord${NC}    ${D}— best for servers / communities${NC}"
+echo -e "    ${W}3)${NC} ${BOLD}Slack${NC}      ${D}— best for internal teams${NC}"
+echo -e "    ${W}4)${NC} ${BOLD}Skip for now${NC} ${D}— configure later${NC}"
+echo ""
+ask_choice "Select first chat interface [1-4]" "1 2 3 4" "1"
+CHANNEL_CHOICE="$REPLY"
+
+TG_TOKEN=""; DC_TOKEN=""; SL_BOT_TOKEN=""; SL_APP_TOKEN=""
+
+configure_telegram() {
+    echo ""
+    echo -e "  ${W}Telegram setup walkthrough${NC}"
+    hint "Open BotFather: https://t.me/BotFather"
+    hint "1. Send /newbot"
+    hint "2. Choose a display name for your bot"
+    hint "3. Choose a unique username ending in 'bot'"
+    hint "4. Copy the token BotFather gives you"
+    hint "5. Start a chat with your bot so it can message you back"
+    ask_optional "Paste Telegram bot token"
+    TG_TOKEN="$REPLY"
+    if [ -n "$TG_TOKEN" ]; then ok "Telegram configured"; fi
+}
+
+configure_discord() {
+    echo ""
+    echo -e "  ${W}Discord setup walkthrough${NC}"
+    hint "Open Discord Developer Portal: https://discord.com/developers/applications"
+    hint "1. Click New Application"
+    hint "2. Open the Bot tab and click Add Bot"
+    hint "3. Reset / copy the bot token"
+    hint "4. In Bot settings, enable Message Content Intent"
+    hint "5. In OAuth2 → URL Generator, select 'bot' scope and invite the bot to your server"
+    ask_optional "Paste Discord bot token"
+    DC_TOKEN="$REPLY"
+    if [ -n "$DC_TOKEN" ]; then ok "Discord configured"; fi
+}
+
+configure_slack() {
+    echo ""
+    echo -e "  ${W}Slack setup walkthrough${NC}"
+    hint "Open Slack app builder: https://api.slack.com/apps"
+    hint "1. Click Create New App"
+    hint "2. Add a bot user under App Home"
+    hint "3. In OAuth & Permissions, install the app and copy the Bot User OAuth Token (xoxb-...)"
+    hint "4. Enable Socket Mode"
+    hint "5. In Basic Information → App-Level Tokens, create a token with connections:write (xapp-...)"
+    hint "6. Invite the bot to the channel you want to use"
+    ask_optional "Paste Slack bot token (xoxb-...)"
+    SL_BOT_TOKEN="$REPLY"
+    if [ -n "$SL_BOT_TOKEN" ]; then
+        ask_required "Paste Slack app token (xapp-...)"
+        SL_APP_TOKEN="$REPLY"
+        ok "Slack configured"
+    fi
+}
+
+case "$CHANNEL_CHOICE" in
+    1) configure_telegram ;;
+    2) configure_discord ;;
+    3) configure_slack ;;
+    4) ok "Skipped messaging channels for now — add one later in ~/.graphclaw/config.json or by re-running install.sh" ;;
+esac
 
 echo ""
 echo -e "  ${D}DevOps skill API keys — all optional, press Enter to skip:${NC}"
@@ -306,61 +364,200 @@ LOVEABLE_KEY="$REPLY"
 # ─────────────────────────────────────────────────────────────────────────────
 step "Writing config & shell integration"
 
-cat > "$CONFIG_FILE" << EOF
-{
-  "workspace": "$WORKSPACE_DIR",
-  "multi_user": $MULTI_USER,
-  "agents": {
-    "model": "$DEFAULT_MODEL",
-    "max_tokens": 8192,
-    "temperature": 0.7,
-    "max_tool_iterations": 200,
-    "dream": { "enabled": true, "interval_hours": 2 }
-  },
-  "providers": {
-    "default_provider": "openrouter",
-    "openrouter": { "api_key": "$OPENROUTER_KEY", "base_url": "https://openrouter.ai/api/v1" },
-    "anthropic":  { "api_key": "$ANTHROPIC_KEY" },
-    "openai":     { "api_key": "$OPENAI_KEY" }
-  },
-  "channels": {
-    "telegram": { "enabled": $([ -n "$TG_TOKEN" ] && echo "true" || echo "false"), "bot_token": "$TG_TOKEN" },
-    "discord":  { "enabled": $([ -n "$DC_TOKEN" ] && echo "true" || echo "false"), "bot_token": "$DC_TOKEN" },
-    "slack":    { "enabled": $([ -n "$SL_BOT_TOKEN" ] && echo "true" || echo "false"), "bot_token": "$SL_BOT_TOKEN", "app_token": "$SL_APP_TOKEN" },
-    "email":    { "enabled": false },
-    "whatsapp": { "enabled": false }
-  },
-  "auth": { "enabled": $MULTI_USER, "secret_key": "$JWT_SECRET" },
-  "skills": {
-    "registry_url": "https://clawhub.ai/api/v1",
-    "installed_path": "$GRAPHCLAW_DIR/skills/installed"
-  }
-}
-EOF
+DEFAULT_PROVIDER_KEY="openrouter"
+case "$PROVIDER_CHOICE" in
+    2) DEFAULT_PROVIDER_KEY="anthropic" ;;
+    3) DEFAULT_PROVIDER_KEY="openai" ;;
+    4) DEFAULT_PROVIDER_KEY="ollama" ;;
+esac
+
+CONFIG_FILE="$CONFIG_FILE" \
+WORKSPACE_DIR="$WORKSPACE_DIR" \
+DEFAULT_MODEL="$DEFAULT_MODEL" \
+DEFAULT_PROVIDER_KEY="$DEFAULT_PROVIDER_KEY" \
+MULTI_USER="$MULTI_USER" \
+JWT_SECRET="$JWT_SECRET" \
+OPENROUTER_KEY="$OPENROUTER_KEY" \
+ANTHROPIC_KEY="$ANTHROPIC_KEY" \
+OPENAI_KEY="$OPENAI_KEY" \
+TG_TOKEN="$TG_TOKEN" \
+DC_TOKEN="$DC_TOKEN" \
+SL_BOT_TOKEN="$SL_BOT_TOKEN" \
+SL_APP_TOKEN="$SL_APP_TOKEN" \
+INSTALLED_SKILLS_PATH="$GRAPHCLAW_DIR/skills/installed" \
+"$PYTHON" - <<'PY'
+import json
+import os
+from pathlib import Path
+
+config_path = Path(os.environ["CONFIG_FILE"])
+existing = {}
+if config_path.exists():
+    try:
+        existing = json.loads(config_path.read_text(encoding="utf-8"))
+    except Exception:
+        existing = {}
+if not isinstance(existing, dict):
+    existing = {}
+
+cfg = existing
+cfg["workspace"] = cfg.get("workspace") or os.environ["WORKSPACE_DIR"]
+cfg["multi_user"] = os.environ["MULTI_USER"].lower() == "true"
+
+agents = cfg.setdefault("agents", {})
+agents["model"] = os.environ["DEFAULT_MODEL"]
+agents.setdefault("max_tokens", 8192)
+agents.setdefault("temperature", 0.7)
+agents.setdefault("max_tool_iterations", 200)
+dream = agents.setdefault("dream", {})
+dream.setdefault("enabled", True)
+dream.setdefault("interval_hours", 2)
+
+providers = cfg.setdefault("providers", {})
+providers["default_provider"] = os.environ["DEFAULT_PROVIDER_KEY"]
+providers.setdefault("openrouter", {"base_url": "https://openrouter.ai/api/v1"})
+providers.setdefault("anthropic", {})
+providers.setdefault("openai", {})
+providers.setdefault("ollama", {"base_url": "http://localhost:11434"})
+if os.environ["OPENROUTER_KEY"]:
+    providers["openrouter"]["api_key"] = os.environ["OPENROUTER_KEY"]
+providers["openrouter"].setdefault("base_url", "https://openrouter.ai/api/v1")
+if os.environ["ANTHROPIC_KEY"]:
+    providers["anthropic"]["api_key"] = os.environ["ANTHROPIC_KEY"]
+if os.environ["OPENAI_KEY"]:
+    providers["openai"]["api_key"] = os.environ["OPENAI_KEY"]
+
+channels = cfg.setdefault("channels", {})
+channels.setdefault("telegram", {"enabled": False, "bot_token": "", "allowed_ids": []})
+channels.setdefault("discord", {"enabled": False, "bot_token": "", "allowed_ids": []})
+channels.setdefault("slack", {"enabled": False, "bot_token": "", "app_token": "", "allowed_ids": []})
+channels.setdefault("email", {"enabled": False})
+channels.setdefault("whatsapp", {"enabled": False})
+if os.environ["TG_TOKEN"]:
+    channels["telegram"]["enabled"] = True
+    channels["telegram"]["bot_token"] = os.environ["TG_TOKEN"]
+if os.environ["DC_TOKEN"]:
+    channels["discord"]["enabled"] = True
+    channels["discord"]["bot_token"] = os.environ["DC_TOKEN"]
+if os.environ["SL_BOT_TOKEN"]:
+    channels["slack"]["enabled"] = True
+    channels["slack"]["bot_token"] = os.environ["SL_BOT_TOKEN"]
+if os.environ["SL_APP_TOKEN"]:
+    channels["slack"]["app_token"] = os.environ["SL_APP_TOKEN"]
+
+auth = cfg.setdefault("auth", {})
+auth["enabled"] = os.environ["MULTI_USER"].lower() == "true"
+if os.environ["JWT_SECRET"]:
+    auth["secret_key"] = os.environ["JWT_SECRET"]
+else:
+    auth.setdefault("secret_key", "")
+
+skills = cfg.setdefault("skills", {})
+skills.setdefault("registry_url", "https://clawhub.ai/api/v1")
+skills["installed_path"] = os.environ["INSTALLED_SKILLS_PATH"]
+
+config_path.parent.mkdir(parents=True, exist_ok=True)
+config_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+PY
 ok "Config written to ${W}$CONFIG_FILE${NC}"
 
-# .env
-ENV_FILE="$GRAPHCLAW_DIR/.env"
-{
-    echo "# Graphclaw environment"
-    echo "GRAPHCLAW_CONFIG_PATH=$CONFIG_FILE"
-    [ -n "$OPENROUTER_KEY" ] && echo "OPENROUTER_API_KEY=$OPENROUTER_KEY"
-    [ -n "$ANTHROPIC_KEY"  ] && echo "ANTHROPIC_API_KEY=$ANTHROPIC_KEY"
-    [ -n "$OPENAI_KEY"     ] && echo "OPENAI_API_KEY=$OPENAI_KEY"
-    [ -n "$BASE44_KEY"     ] && echo "BASE44_API_KEY=$BASE44_KEY"
-    [ -n "$LOVEABLE_KEY"   ] && echo "LOVEABLE_API_KEY=$LOVEABLE_KEY"
-} > "$ENV_FILE"
+ENV_FILE="$ENV_FILE" \
+CONFIG_FILE="$CONFIG_FILE" \
+GRAPHCLAW_HOME="$GRAPHCLAW_DIR" \
+OPENROUTER_KEY="$OPENROUTER_KEY" \
+ANTHROPIC_KEY="$ANTHROPIC_KEY" \
+OPENAI_KEY="$OPENAI_KEY" \
+BASE44_KEY="$BASE44_KEY" \
+LOVEABLE_KEY="$LOVEABLE_KEY" \
+"$PYTHON" - <<'PY'
+import os
+from pathlib import Path
+
+env_path = Path(os.environ["ENV_FILE"])
+existing = {}
+if env_path.exists():
+    for raw in env_path.read_text(encoding="utf-8").splitlines():
+        if not raw or raw.lstrip().startswith("#") or "=" not in raw:
+            continue
+        key, value = raw.split("=", 1)
+        existing[key] = value
+
+updates = {
+    "GRAPHCLAW_CONFIG_PATH": os.environ["CONFIG_FILE"],
+    "GRAPHCLAW_HOME": os.environ["GRAPHCLAW_HOME"],
+    "OPENROUTER_API_KEY": os.environ["OPENROUTER_KEY"],
+    "ANTHROPIC_API_KEY": os.environ["ANTHROPIC_KEY"],
+    "OPENAI_API_KEY": os.environ["OPENAI_KEY"],
+    "BASE44_API_KEY": os.environ["BASE44_KEY"],
+    "LOVEABLE_API_KEY": os.environ["LOVEABLE_KEY"],
+}
+for key, value in updates.items():
+    if value:
+        existing[key] = value
+    elif key not in existing and key in {"GRAPHCLAW_CONFIG_PATH", "GRAPHCLAW_HOME"}:
+        existing[key] = value
+
+lines = ["# Graphclaw environment"]
+for key in [
+    "GRAPHCLAW_CONFIG_PATH",
+    "GRAPHCLAW_HOME",
+    "OPENROUTER_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "BASE44_API_KEY",
+    "LOVEABLE_API_KEY",
+]:
+    value = existing.get(key, "")
+    if value:
+        lines.append(f"{key}={value}")
+env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
 ok ".env written"
 
-# run.sh — activates venv, sets config, runs jac
 cat > "$GRAPHCLAW_DIR/run.sh" << RUNEOF
 #!/usr/bin/env bash
+set -e
 source "$VENV_DIR/bin/activate"
 export GRAPHCLAW_CONFIG_PATH="$CONFIG_FILE"
-exec jac run --no-autonative "$SCRIPT_DIR/graphclaw/main.jac" "\$@"
+export GRAPHCLAW_HOME="$GRAPHCLAW_DIR"
+case "\${1:-}" in
+  update)
+    shift
+    exec "$VENV_DIR/bin/python" -m graphclaw.update_manager update "\$@"
+    ;;
+  rollback)
+    shift
+    exec "$VENV_DIR/bin/python" -m graphclaw.update_manager rollback "\$@"
+    ;;
+  status)
+    shift
+    exec "$VENV_DIR/bin/python" -m graphclaw.update_manager status "\$@"
+    ;;
+esac
+exec jac run --no-autonative "$SOURCE_DIR/graphclaw/main.jac" "\$@"
 RUNEOF
 chmod +x "$GRAPHCLAW_DIR/run.sh"
 ok "Startup script: ${W}~/.graphclaw/run.sh${NC}"
+
+cat > "$GRAPHCLAW_DIR/update.sh" << UPDATEEOF
+#!/usr/bin/env bash
+set -e
+source "$VENV_DIR/bin/activate"
+export GRAPHCLAW_CONFIG_PATH="$CONFIG_FILE"
+export GRAPHCLAW_HOME="$GRAPHCLAW_DIR"
+exec "$VENV_DIR/bin/python" -m graphclaw.update_manager update "\$@"
+UPDATEEOF
+chmod +x "$GRAPHCLAW_DIR/update.sh"
+
+cat > "$GRAPHCLAW_DIR/rollback.sh" << ROLLBACKEOF
+#!/usr/bin/env bash
+set -e
+source "$VENV_DIR/bin/activate"
+export GRAPHCLAW_CONFIG_PATH="$CONFIG_FILE"
+export GRAPHCLAW_HOME="$GRAPHCLAW_DIR"
+exec "$VENV_DIR/bin/python" -m graphclaw.update_manager rollback "\$@"
+ROLLBACKEOF
+chmod +x "$GRAPHCLAW_DIR/rollback.sh"
 
 # Shell alias
 SHELL_RC=""
@@ -418,4 +615,8 @@ if [ -n "$SHELL_RC" ]; then
 fi
 echo -e "  ${W}2. Start graphclaw:${NC}"
 echo -e "       ${W}graphclaw${NC}"
+echo ""
+echo -e "  ${D}Later, manage updates safely with:${NC}"
+echo -e "       ${W}graphclaw update${NC}"
+echo -e "       ${W}graphclaw rollback${NC}"
 echo ""

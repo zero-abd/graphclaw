@@ -98,21 +98,27 @@ graphclaw              # interactive CLI
 
 ## Update
 
-**Linux / macOS / WSL:**
+Graphclaw updates only the managed code under `~/.graphclaw/source` and keeps your
+config, workspace, sessions, and memory outside the code tree.
+
+**Update safely:**
 ```bash
-cd ~/.graphclaw/source   # or wherever you cloned graphclaw
-git pull
-~/.graphclaw/venv/bin/pip install -e . -q
+graphclaw update
+```
+
+**Rollback the last update:**
+```bash
+graphclaw rollback
 ```
 
 **Windows (PowerShell):**
 ```powershell
-cd ~\.graphclaw\source   # or wherever you cloned graphclaw
-git pull
-~\.graphclaw\venv\Scripts\pip install -e . -q
+graphclaw update
+graphclaw rollback
 ```
 
-Or re-run the installer — it will overwrite the existing venv and config.
+When a new release is available, Graphclaw will ask whether you want to update
+the next time the interactive CLI starts.
 
 ---
 
