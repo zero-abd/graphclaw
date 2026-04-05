@@ -1,9 +1,10 @@
 {
   "name": "base44",
-  "description": "Use the official Base44 CLI flow to scaffold, inspect, and deploy Base44 projects with low friction",
+  "description": "Use Base44's documented MCP servers for AI-assisted app creation and the official CLI for local backend project workflows",
   "version": "0.1.0",
   "author": "graphclaw",
   "tools": [
+    "mcp_server_guide",
     "ensure_cli",
     "login_guide",
     "create_project",

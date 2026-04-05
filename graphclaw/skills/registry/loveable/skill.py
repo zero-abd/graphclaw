@@ -1,4 +1,4 @@
-"""Official Loveable integration using Build with URL links."""
+"""Official Loveable integration centered on Build with URL plus Playwright MCP automation."""
 
 from __future__ import annotations
 
@@ -7,6 +7,22 @@ from urllib.parse import quote
 
 
 _BASE_URL = "https://lovable.dev/?autosubmit=true#"
+
+
+def playwright_mcp_guide() -> dict:
+    """Return the recommended Playwright MCP setup for Lovable browser automation."""
+    return {
+        "server": {
+            "playwright": {
+                "command": "npx",
+                "args": ["@playwright/mcp@latest", "--headless"],
+            }
+        },
+        "notes": [
+            "Graphclaw can use Playwright MCP to log into Lovable, wait for generation, publish, and capture screenshots.",
+            "Use configure_platform_mcp_servers to add the recommended Playwright MCP config automatically.",
+        ],
+    }
 
 
 def _encode_images(images: list[str]) -> str:
@@ -22,7 +38,8 @@ def build_with_url(prompt: str, images: list[str] | None = None, open_browser: b
     """Create a docs-supported Lovable Build with URL link.
 
     This opens Lovable and begins creating the app after the user logs in
-    and picks a workspace. It does not publish the app automatically.
+    and picks a workspace. Graphclaw can then drive Lovable through a
+    Playwright MCP server to publish and collect the shareable URL.
     """
     cleaned_prompt = str(prompt or "").strip()
     if not cleaned_prompt:

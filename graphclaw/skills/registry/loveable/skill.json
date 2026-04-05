@@ -1,9 +1,10 @@
 {
   "name": "loveable",
-  "description": "Generate official Lovable Build with URL links and publish-ready guidance for fast website and app creation",
+  "description": "Generate official Lovable Build with URL links and let Playwright MCP automate the browser flow to publish and share the final site URL",
   "version": "0.1.0",
   "author": "graphclaw",
   "tools": [
+    "playwright_mcp_guide",
     "build_with_url",
     "build_landing_page_url",
     "publish_guide"
