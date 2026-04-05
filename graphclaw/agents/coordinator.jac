@@ -30,6 +30,9 @@ walker CoordinatorAgent {
         from graphclaw.agents.devops import DevOpsAgent
         from graphclaw.agents.planner import PlannerAgent
         from graphclaw.agents.researcher import ResearcherAgent
+        from graphclaw.config.loader import load_config
+        from graphclaw.tools.filesystem import EditFileTool, ListDirTool, ReadFileTool, WriteFileTool
+        from graphclaw.tools.shell import ShellTool
         from graphclaw.tools.web import WebFetchTool, WebSearchTool
 
         agent_map = {
@@ -49,12 +52,17 @@ walker CoordinatorAgent {
             kwargs["model"] = self.model
 
         if intent.agent == "coordinator" or intent.confidence < 0.6:
+            ws = load_config().workspace
             agent = BaseAgent(**kwargs)
             agent.system_prompt = (
                 "You are Graphclaw, a helpful multi-agent AI assistant. "
-                "Answer directly and clearly. Use tools when helpful, and be honest about uncertainty."
+                "Answer directly and clearly. Use tools when helpful, and be honest about uncertainty. "
+                "You can inspect files, edit workspace files, and execute terminal commands when the task calls for it."
             )
-            agent.tools = [WebSearchTool(), WebFetchTool()]
+            agent.tools = [
+                ReadFileTool(ws), WriteFileTool(ws), EditFileTool(ws), ListDirTool(ws),
+                ShellTool(ws), WebSearchTool(), WebFetchTool(),
+            ]
         else:
             agent_cls = agent_map.get(intent.agent, BaseAgent)
             agent = agent_cls(**kwargs)
