@@ -40,9 +40,15 @@ def test_install_sh_installs_channel_extras():
     install_sh = (REPO_ROOT / "install.sh").read_text(encoding="utf-8")
 
     assert 'pip install -e "${SOURCE_DIR}[channels]" -q 2>/dev/null' in install_sh
+    assert "resolve_telegram_bot_username()" in install_sh
+    assert 'Client onboarding link: https://t.me/$TG_USERNAME' in install_sh
+    assert 'pairing approve telegram <code>' in install_sh
 
 
 def test_install_ps1_installs_channel_extras():
     install_ps1 = (REPO_ROOT / "install.ps1").read_text(encoding="utf-8")
 
     assert '& $VenvPip install -e "${SourceDir}[channels]" 2>&1' in install_ps1
+    assert "function Resolve-TelegramBotUsername" in install_ps1
+    assert 'Client onboarding link: https://t.me/$tgUsername' in install_ps1
+    assert 'pairing approve telegram <code>' in install_ps1
