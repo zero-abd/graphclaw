@@ -1,5 +1,5 @@
 import "./dashboard.css";
-cl import from "./graph_helpers.js" { GraphMemoryCanvas }
+cl import from "./graph_helpers.js" { GraphMemoryCanvas, fetchDashboardMemory }
 sv import from graphclaw.dashboard { dashboard_memory, dashboard_overview, OverviewResponse, MemoryResponse }
 
 
@@ -203,10 +203,13 @@ def SkillsContent(overview: OverviewResponse) -> JsxElement {
 }
 
 
-def GraphView(memory: MemoryResponse) -> JsxElement {
+def GraphView(memory: MemoryResponse, onRefresh: any) -> JsxElement {
     return <div className="graph-shell">
+        <div className="graph-toolbar">
+            <button className="graph-refresh" onClick={onRefresh}>Refresh graph</button>
+        </div>
         <div className="graph-canvas">
-            <GraphMemoryCanvas initialData={memory}/>
+            <GraphMemoryCanvas memory={memory}/>
         </div>
         <div className="graph-legend">
             <div className="list-item"><div className="list-item-title">Root node</div><div className="list-item-meta">Pinned assistant origin for the graph cluster</div></div>
@@ -231,7 +234,7 @@ def MemoryContent(memory: MemoryResponse) -> JsxElement {
         </div>
         <div className="memory-grid">
             <SectionCard title="Knowledge Graph" subtitle="Jac-style node-link view of the current memory graph" body={
-                <GraphView memory={memory}/>
+                <GraphView memory={memory} onRefresh={lambda -> None { memory = await dashboard_memory(); }}/>
             }/>
             <div className="stack">
                 <SectionCard title="Core Identity Graph" subtitle="Seeded root graph available before conversations begin" body={

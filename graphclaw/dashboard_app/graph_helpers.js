@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 
 function toGraphData(memory) {
@@ -60,7 +60,7 @@ function drawGraphNode(node, ctx, globalScale) {
   if (line2) ctx.fillText(line2, node.x, node.y + fontSize * 0.58);
 }
 
-async function fetchDashboardMemory() {
+export async function fetchDashboardMemory() {
   const response = await fetch('/function/dashboard_memory', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -70,28 +70,8 @@ async function fetchDashboardMemory() {
   return payload?.data?.result || payload?.data || {};
 }
 
-export function GraphMemoryCanvas({ initialData }) {
-  const [memory, setMemory] = useState(initialData || {});
-
-  useEffect(() => {
-    let cancelled = false;
-    const refresh = async () => {
-      try {
-        const next = await fetchDashboardMemory();
-        if (!cancelled) setMemory(next);
-      } catch {
-        // keep last good graph frame
-      }
-    };
-    refresh();
-    const id = window.setInterval(refresh, 2500);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, []);
-
-  const graphData = useMemo(() => toGraphData(memory), [memory]);
+export function GraphMemoryCanvas({ memory }) {
+  const graphData = useMemo(() => toGraphData(memory || {}), [memory]);
 
   return React.createElement(ForceGraph2D, {
     graphData,
@@ -110,10 +90,11 @@ export function GraphMemoryCanvas({ initialData }) {
     linkDirectionalArrowLength: 6,
     linkDirectionalArrowRelPos: 1,
     linkCurvature: 0.1,
-    cooldownTicks: 220,
-    warmupTicks: 100,
     d3VelocityDecay: 0.16,
     width: 960,
     height: 460,
+    enableNodeDrag: true,
+    cooldownTicks: 0,
+    warmupTicks: 0,
   });
 }
