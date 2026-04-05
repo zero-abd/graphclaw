@@ -28,6 +28,14 @@ def test_with_repo_on_pythonpath_prepends_repo_root(monkeypatch):
     assert env['PYTHONPATH'].split(os.pathsep)[0] == '/tmp/repo'
 
 
+def test_dashboard_subprocess_env_enforces_utf8(monkeypatch):
+    monkeypatch.setattr(dashboard_runtime, '_repo_root', lambda: Path('/tmp/repo'))
+    env = dashboard_runtime._with_dashboard_subprocess_env({})
+    assert env['PYTHONPATH'].split(os.pathsep)[0] == '/tmp/repo'
+    assert env['PYTHONIOENCODING'] == 'utf-8'
+    assert env['PYTHONUTF8'] == '1'
+
+
 def test_ensure_local_dashboard_launches_jac_from_dashboard_app(monkeypatch):
     monkeypatch.setattr(
         dashboard_runtime,

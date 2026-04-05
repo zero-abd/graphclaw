@@ -91,6 +91,15 @@ def _with_repo_on_pythonpath(env: dict[str, str]) -> dict[str, str]:
     return updated
 
 
+def _with_dashboard_subprocess_env(env: dict[str, str]) -> dict[str, str]:
+    updated = _with_repo_on_pythonpath(env)
+    updated.setdefault("PYTHONIOENCODING", "utf-8")
+    updated.setdefault("PYTHONUTF8", "1")
+    if os.name == "nt":
+        updated.setdefault("TERM", "xterm-256color")
+    return updated
+
+
 def _is_dashboard_reachable(url: str, timeout: float = 0.4) -> bool:
     try:
         with urllib.request.urlopen(url, timeout=timeout) as response:
@@ -185,7 +194,7 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
 
     _ensure_dashboard_client_sync()
     log_handle = _log_path().open("a", encoding="utf-8")
-    env = _with_repo_on_pythonpath(dict(os.environ))
+    env = _with_dashboard_subprocess_env(dict(os.environ))
     env.setdefault("GRAPHCLAW_CONFIG_PATH", os.environ.get("GRAPHCLAW_CONFIG_PATH", ""))
     env.setdefault("GRAPHCLAW_HOME", str(_graphclaw_home()))
     cmd = [_jac_executable(), "start", "--dev", "--port", str(cfg["port"])]
