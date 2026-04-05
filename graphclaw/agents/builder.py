@@ -5,6 +5,7 @@ from graphclaw.tools.filesystem import ReadFileTool, WriteFileTool, EditFileTool
 from graphclaw.tools.shell import ShellTool
 from graphclaw.tools.web import WebSearchTool, WebFetchTool
 from graphclaw.config.loader import load_config
+from graphclaw.skills.tooling import attach_skill_runtime
 
 
 class BuilderAgent(BaseAgent):
@@ -24,3 +25,4 @@ class BuilderAgent(BaseAgent):
             ListDirTool(ws), ShellTool(ws),
             WebSearchTool(), WebFetchTool(),
         ]
+        attach_skill_runtime(self)

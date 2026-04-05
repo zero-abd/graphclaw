@@ -9,12 +9,11 @@ from graphclaw.tools.web import WebSearchTool, WebFetchTool
 from graphclaw.skills.loader import (
     build_skills_summary,
     install_skill,
-    invoke_skill_async,
-    list_skills,
     search_clawhub,
     update_all_skills,
     update_skill,
 )
+from graphclaw.skills.tooling import attach_skill_runtime
 from graphclaw.config.loader import load_config
 
 
@@ -49,57 +48,6 @@ class _InstallSkillTool:
         return await install_skill(kwargs["source"])
 
 
-class _ListSkillsTool:
-    name = "list_available_skills"
-    description = "List all installed skills and their status."
-    parameters = {"type": "object", "properties": {}}
-
-    async def execute(self, **kwargs: Any) -> str:
-        skills = list_skills()
-        return json.dumps(skills, indent=2)
-
-
-class _InvokeSkillTool:
-    name = "invoke_skill"
-    description = (
-        "Read an installed OpenClaw/ClawHub SKILL.md skill for the current task, or invoke a legacy native skill when explicitly requested."
-    )
-    parameters = {
-        "type": "object",
-        "properties": {
-            "slug": {"type": "string", "description": "Installed skill slug"},
-            "function_name": {
-                "type": "string",
-                "description": "Native function to call (omit to list available functions)",
-                "default": "",
-            },
-            "arguments": {
-                "type": "object",
-                "description": "Arguments to pass to the native skill function",
-                "default": {},
-            },
-            "task": {
-                "type": "string",
-                "description": "Optional task description when reading a ClawHub SKILL.md",
-                "default": "",
-            },
-        },
-        "required": ["slug"],
-    }
-
-    async def execute(self, **kwargs: Any) -> str:
-        arguments = kwargs.get("arguments", {}) or {}
-        if kwargs.get("task"):
-            arguments["task"] = kwargs["task"]
-        return await invoke_skill_async(
-            kwargs["slug"],
-            kwargs.get("function_name", ""),
-            **arguments,
-        )
-
-
-
-
 class _UpdateSkillTool:
     name = "update_skill"
     description = "Update one installed OpenClaw/ClawHub skill tracked in .clawhub/lock.json."
@@ -130,9 +78,8 @@ class DevOpsAgent(BaseAgent):
         "You are a DevOps and infrastructure specialist. You manage deployments, CI/CD pipelines, "
         "containers, and cloud services. You can also search and install skills from ClawHub "
         "(clawhub.ai) — the OpenClaw skills registry. Use shell commands for system operations. "
-        "Skills come in two types:\n"
-        "1. Native skills: Python functions you can call directly\n"
-        "2. ClawHub skills: SKILL.md files with step-by-step instructions to follow\n"
+        "Primary skills are OpenClaw-style SKILL.md bundles that you should read and follow before "
+        "inventing a custom workflow. Legacy native Python skills remain fallback-only.\n"
         "Always verify before making destructive changes."
     )
 
@@ -148,5 +95,6 @@ class DevOpsAgent(BaseAgent):
         self.tools = [
             ReadFileTool(ws), WriteFileTool(ws), ListDirTool(ws),
             ShellTool(ws), WebSearchTool(), WebFetchTool(),
-            _SearchClawHubTool(), _InstallSkillTool(), _UpdateSkillTool(), _UpdateAllSkillsTool(), _ListSkillsTool(), _InvokeSkillTool(),
+            _SearchClawHubTool(), _InstallSkillTool(), _UpdateSkillTool(), _UpdateAllSkillsTool(),
         ]
+        attach_skill_runtime(self)
