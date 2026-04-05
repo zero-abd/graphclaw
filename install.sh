@@ -75,7 +75,7 @@ choice_card() {
 
 ask_optional() {
     REPLY=""
-    printf "  %b%s%b %b%s%b %b(optional, Enter to skip)%b: " "$C" "$ASK_ICON" "$NC" "$BOLD" "$1" "$NC" "$D" "$NC"
+    echo -ne "  ${C}?${NC} ${BOLD}$1${NC} ${D}(optional, Enter to skip)${NC}: "
     if ! read -r REPLY; then
         REPLY=""
     fi
@@ -83,7 +83,7 @@ ask_optional() {
 ask_required() {
     REPLY=""
     while true; do
-        printf "  %b%s%b %b%s%b: " "$C" "$ASK_ICON" "$NC" "$BOLD" "$1" "$NC"
+        echo -ne "  ${C}?${NC} ${BOLD}$1${NC}: "
         if ! read -r REPLY; then
             fail "Input aborted."
         fi
@@ -96,7 +96,7 @@ ask_choice() {
     local answer=""
     REPLY="$default"
     while true; do
-        printf "  %b%s%b %b%s%b %b[default: %s]%b: " "$C" "$ASK_ICON" "$NC" "$BOLD" "$prompt" "$NC" "$D" "$default" "$NC"
+        echo -ne "  ${C}?${NC} ${BOLD}$prompt${NC} ${D}[default: ${default}]${NC}: "
         if ! read -r answer; then
             fail "Input aborted."
         fi
