@@ -1,18 +1,17 @@
 <div align="center">
   <h1>⚡ Graphclaw</h1>
-  <p><strong>Graph-native multi-agent AI platform — built entirely in Jac</strong></p>
+  <p><strong>Graph-native AI assistant runtime in Jac</strong></p>
   <p>
     <img src="https://img.shields.io/badge/jac-0.13.5-blueviolet" alt="Jac">
-    <img src="https://img.shields.io/badge/python-≥3.12-blue" alt="Python">
+    <img src="https://img.shields.io/badge/python-3.12%2B-blue" alt="Python 3.12+">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
     <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status">
-    <a href="https://discord.gg/graphclaw"><img src="https://img.shields.io/badge/Discord-Community-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord"></a>
   </p>
 </div>
 
-**Graphclaw** is a multi-agent AI platform where memory lives in a property graph, agents are graph walkers, and skills can be installed from the internet at runtime — all written in **[Jac](https://www.jac-lang.org/)**, the AI-native full-stack language built on Jaseci.
+**Graphclaw** is a graph-native AI assistant runtime where memory is stored as a live knowledge graph, tools are exposed through Jac and Python, and skills plus MCP servers can be attached at runtime. It is written in **[Jac](https://www.jac-lang.org/)** and runs on top of the current Jaseci/Jac toolchain.
 
-Inspired by [nanobot](https://github.com/HKUDS/nanobot) and [openclaw](https://github.com/openclaw/openclaw). Graphclaw replaces the flat-file memory model with a live, decaying, self-maintaining graph — and adds a coordinator that routes tasks across a team of specialist agents.
+Inspired by **[nanobot](https://github.com/HKUDS/nanobot)** and **[openclaw](https://github.com/openclaw/openclaw)**, Graphclaw keeps the agent experience local and extensible while leaning hard into graph memory, Jac-native control surfaces, OpenClaw-style skills, and MCP integration.
 
 ---
 
@@ -20,306 +19,283 @@ Inspired by [nanobot](https://github.com/HKUDS/nanobot) and [openclaw](https://g
 
 |  | nanobot | openclaw | **Graphclaw** |
 |---|---|---|---|
-| Language | Python | TypeScript | **Jac (compiles to Python)** |
-| Memory | Flat `.md` files | File-based | **OSP property graph** |
-| Memory recall | LLM summarization | File scan | **Indexed graph traversal + optional semantic** |
-| Agents | Single agent | Single agent | **Multi-agent (Coordinator, DevOps, Planner, Builder, Researcher)** |
-| Skills | SKILL.md files | ClawHub | **Dynamic directory + online GitHub install** |
-| Multi-user | No | No | **Config scaffold present (runtime still alpha)** |
-| Deployment | pip | pip | **`jac run` → `jac start` → `jac start --scale` (Kubernetes)** |
-| AI functions | LLM calls | LLM calls | **`by llm()` — Meaning Typed Programming** |
+| Language | Python | TypeScript | **Jac + Python** |
+| Core memory | Flat markdown | Files + runtime state | **Workspace-backed knowledge graph** |
+| Skills | Prompt/files | SKILL.md ecosystem | **Native skills + OpenClaw-style SKILL.md + ClawHub** |
+| MCP support | Limited / external | Core concept | **Configured MCP servers exposed to all agents** |
+| Browser automation | Usually external | Growing ecosystem | **Playwright-backed browser helpers** |
+| Dashboard | External / ad hoc | Web-first control UI | **Jac-native dashboard app** |
+| Initial graph state | Usually empty | Tool/runtime first | **Seeded root graph with identity, skills, MCP, dream cadence** |
 
 ---
 
 ## Features
 
-🧠 **Graph Memory** — Facts live as typed nodes (`User`, `Feedback`, `Project`, `Reference`) with confidence scores that decay over time. The `Dream` walker runs in the background to prune stale nodes, revalidate memories, and keep topic tags fresh — without rewriting a blob of markdown.
+### 🧠 Graph memory from the first launch
+- Root assistant graph is seeded immediately
+- Built-in identity nodes include:
+  - root
+  - name
+  - identity
+  - soul
+  - conversation cadence
+  - dream cadence
+- Skills and MCP now also live in the root graph as capability subtrees
+- Sessions, turns, consolidated memories, and dream maintenance extend the graph over time
 
-🤖 **Multi-Agent Team** — A `Coordinator` agent classifies your intent and routes to the right specialist:
-- **DevOps** — deployments, infra, CI/CD, Base44, Loveable
-- **Planner** — task breakdown, project management, priorities
-- **Builder** — code writing, file editing, shell, git
-- **Researcher** — web search, knowledge extraction, memory synthesis
+### 🤖 Multi-agent runtime
+Graphclaw routes work through specialist agents:
+- **Coordinator runtime** — routes intent and keeps identity consistent
+- **DevOps** — deployment, infra, builders, skill/MCP operations
+- **Planner** — planning and breakdown
+- **Builder** — implementation and editing
+- **Researcher** — research, search, synthesis
 
-🔌 **Skill Directory** — Skills are self-contained modules with a `skill.json` manifest and a `skill.py` tool file. Install new skills at runtime from any GitHub URL or the central registry — no restart needed. Native skills can be listed and invoked through the DevOps agent's generic skill tools.
+These agents now share:
+- OpenClaw-style skill runtime
+- MCP runtime access where relevant
+- shared graph memory context
 
-⚡ **Jac OSP** — Nodes connected to `root` auto-persist. Per-user isolation is built in. Walkers traverse data instead of pulling it to logic.
+### 🔌 Skills system
+Graphclaw supports:
+- **native skills** via `skill.json` + `skill.py`
+- **workflow skills** via `SKILL.md`
+- **ClawHub installation/update flows**
+- workspace/shared/bundled precedence similar to OpenClaw-style skill selection
 
-🌐 **5 Channels** — Telegram, Discord, Slack, Email, WhatsApp. One message bus routes everything.
+### 🔗 MCP support
+Configured MCP servers are exposed through runtime tools such as:
+- listing servers
+- refreshing MCP catalogs
+- listing tools/resources/prompts
+- calling MCP tools
+- reading MCP resources
+- resolving MCP prompts
 
-🔑 **Multi-Provider** — OpenRouter (default), Anthropic, OpenAI, DeepSeek, Groq, Ollama, and any OpenAI-compatible endpoint.
+### 🌐 Channels
+Current channel integrations include:
+- Telegram
+- Discord
+- Slack
+- Email
+- WhatsApp bridge
+
+### 🧪 Jac-native dashboard
+The local dashboard is a real Jac client app and includes:
+- Overview
+- Sessions
+- Channels
+- Skills
+- Graph Memory
+
+### 🖥 Browser automation helpers
+Graphclaw includes Playwright-backed browser helpers for:
+- screenshots
+- browser progress capture
+- automation support for builder/platform flows
 
 ---
 
 ## Install
 
-**One command. Works on Linux, macOS, and Windows.**
+**Requirements:**
+- **[Python 3.12+](https://docs.python.org/3.12/)**
+- **[Git](https://git-scm.com/)**
 
 **Linux / macOS / WSL:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.sh | bash
 ```
 
-**Windows (PowerShell — run as Administrator):**
+**Windows (PowerShell):**
 ```powershell
 irm https://raw.githubusercontent.com/zero-abd/graphclaw/main/install.ps1 | iex
 ```
 
-**From a local clone:**
+**Local clone:**
 ```bash
 git clone https://github.com/zero-abd/graphclaw
 cd graphclaw
-bash install.sh        # Linux / macOS / WSL
-.\install.ps1          # Windows PowerShell
+bash install.sh
 ```
 
-> **Requirements:** Python 3.12+ and Git. The installer handles everything else — including installing the `jac` CLI and all dependencies.
+The installer configures:
+1. deployment mode
+2. default model provider
+3. first chat channel
+4. optional builder skill credentials
 
-The interactive wizard will ask you:
-1. **Deployment mode** — single-user (personal) or multi-user (hosted)
-2. **LLM provider** — OpenRouter, Anthropic, OpenAI, or Ollama
-3. **Channels** — Telegram, Discord, Slack tokens *(press Enter to skip)*
-4. **Skill API keys** — Base44, Loveable *(optional, add later)*
-
-Then start:
-
-```bash
-source ~/.bashrc       # or ~/.zshrc — reload your shell once
-graphclaw              # interactive CLI
-```
-
-**Windows:**
-```powershell
-. $PROFILE             # reload your PowerShell profile once
-graphclaw              # interactive CLI
-```
-
----
-
-## Update
-
-Graphclaw updates only the managed code under `~/.graphclaw/source` and keeps your
-config, workspace, sessions, and memory outside the code tree.
-
-**Update safely:**
-```bash
-graphclaw update
-```
-
-**Rollback the last update:**
-```bash
-graphclaw rollback
-```
-
-**Windows (PowerShell):**
-```powershell
-graphclaw update
-graphclaw rollback
-```
-
-When a new release is available, Graphclaw will ask whether you want to update
-the next time the interactive CLI starts.
-
----
-
-## Quick Start
-
-**CLI mode:**
+Then launch:
 ```bash
 graphclaw
-> deploy my app to base44
-> [devops] Checking Base44 apps... deploying graphclaw-demo... done ✓
 ```
 
-**Local Jac fallback:** if your Jac toolchain errors during native auto-compilation, run the CLI with `jac run --no-autonative graphclaw/main.jac` (the generated installer scripts already use this).
-
-**As an HTTP server (multi-user):**
-```bash
-jac start graphclaw/main.jac   # → http://localhost:8000
-```
-
-**Scale to Kubernetes:**
-```bash
-jac start --scale graphclaw/main.jac
+Windows:
+```powershell
+graphclaw
 ```
 
 ---
 
-## Memory
+## Quick start
 
-Memory is a graph, not a file. Every fact is a node:
-
-```
-root
- ├──[:HasMemory]──▶ Memory { content, type, confidence: 0.9, decay_rate: 0.01 }
- ├──[:HasSession]──▶ Session ──[:HasTurn]──▶ Turn
- └──▶ Topic ──[:Tagged]──▶ Memory
-           Memory ──[:Relates { contradicts | refines | derived_from }]──▶ Memory
+### Interactive local mode
+```bash
+graphclaw
 ```
 
-**Confidence decay** — every memory loses `0.01` confidence per day since last validation. After ~90 days without revalidation a fact is considered stale and tombstoned by `Dream`.
+In the normal interactive single-user flow Graphclaw will:
+- start the runtime
+- start the local dashboard if enabled
+- fall back to CLI chat when no channel is enabled
 
-**Dual recall** — substring match by default (fast), semantic recall via `by llm()` on demand:
-```
-agent.recall("deployment strategy")          # substring
-agent.recall("deployment strategy", semantic=True)   # + LLM semantic check
+### Local dashboard
+By default, the local dashboard runs at:
+```text
+http://127.0.0.1:18789/
 ```
 
-**Dream** runs every 2 hours:
-- Tombstones zero-confidence nodes
-- Auto-tags untagged memories with topic nodes
-- Revalidates still-accurate decaying memories
+### API / hosted mode
+```bash
+jac start graphclaw/main.jac
+```
+
+### Local Jac fallback
+If the toolchain needs the safer local execution path:
+```bash
+jac run --no-autonative graphclaw/main.jac
+```
+
+---
+
+## Memory model
+
+Graphclaw's graph starts with seeded assistant structure, then grows through use:
+
+```text
+assistant_root
+├── assistant_name
+├── assistant_identity
+├── assistant_soul
+├── assistant_conversation_cadence
+├── assistant_dream_cadence
+├── assistant_skills_root
+│   ├── assistant_skills_inherent
+│   ├── assistant_skills_clawhub
+│   ├── assistant_skills_workspace
+│   └── assistant_skills_shared
+└── assistant_mcp_root
+    ├── assistant_mcp_servers
+    ├── assistant_mcp_tools
+    ├── assistant_mcp_resources
+    └── assistant_mcp_prompts
+```
+
+As conversations happen, Graphclaw adds:
+- sessions
+- turns
+- consolidated memory nodes
+- relationships
+- topic tags
+
+And every 2 hours **Dream** can:
+- decay confidence
+- revalidate memory
+- tag untagged nodes
+- tombstone stale memories
 
 ---
 
 ## Skills
 
-Graphclaw supports two skill types:
+Graphclaw uses two skill styles:
 
-**Native skills** — `skill.json` manifest + `skill.py` Python tools (fast, typed):
-```
-skills/registry/
-└── base44/
-    ├── skill.json    ← manifest (name, description, tools list)
-    └── skill.py      ← async Python tool functions
-```
-
-**ClawHub skills** — `SKILL.md` with YAML frontmatter + markdown instructions (13k+ in registry):
-```
-~/.graphclaw/skills/installed/kubernetes/
-└── SKILL.md          ← frontmatter metadata + step-by-step instructions
-```
-The DevOps agent reads the instructions and executes them using its built-in shell, web, and file tools — the same way OpenClaw runs skills, but via Graphclaw's Python ShellTool instead of a Node.js exec host.
-
-**Built-in skills:** `base44`, `loveable`
-
-**Install a skill from ClawHub (13,000+ skills):**
-```
-> install the kubernetes skill
-[devops] Searching ClawHub for 'kubernetes'...
-[devops] Downloading and installing 'kubernetes' from clawhub.ai...
-✓ Skill installed — use `invoke_skill` / follow the returned instructions to use it
+### Native skills
+```text
+graphclaw/skills/registry/<skill>/
+├── skill.json
+└── skill.py
 ```
 
-Or directly from the Jac graph:
-```python
-InstallSkill(source="kubernetes") spawn root         # ClawHub slug
-InstallSkill(source="https://github.com/org/r.zip") spawn root  # direct ZIP URL
+### OpenClaw-style workflow skills
+```text
+<skill>/SKILL.md
 ```
 
-**Skills the DevOps agent can tap into:**
+The runtime supports:
+- listing installed skills
+- recommending skills semantically
+- invoking skill workflows
+- approval-aware skill installation
+- updating installed skills
 
-| Skill | Type | Invocation |
-|---|---|---|
-| `base44` | native | `invoke_skill(slug="base44", function_name="deploy_app", arguments={...})` |
-| `loveable` | native | `invoke_skill(slug="loveable", function_name="send_prompt", arguments={...})` |
-| `kubernetes` *(clawhub)* | ClawHub | `invoke_skill(slug="kubernetes", task="apply my manifest")` |
-| *any clawhub slug* | ClawHub | `invoke_skill(slug="<slug>", task="...")` |
+Built-in examples include:
+- `base44`
+- `loveable`
 
 ---
 
-## Agents
+## MCP
 
-```
-User message
-    │
-    ▼
-CoordinatorAgent
-    │  classify_intent() by llm()
-    ├──▶ DevOpsAgent    — infra, deployments, Base44, Loveable, shell
-    ├──▶ PlannerAgent   — task breakdown, project plans, priorities
-    ├──▶ BuilderAgent   — code, file edits, shell, git
-    └──▶ ResearcherAgent — web search, knowledge extraction
-```
+Graphclaw reads MCP configuration from `mcpServers` / `mcp_servers` config and exposes that runtime to agents.
 
-All agents share the same memory graph. DevOps leaving a fact about a failed deployment is immediately visible to Coordinator on the next turn.
-
----
-
-## Channels
-
-| Channel | Setup |
-|---|---|
-| Telegram | `TELEGRAM_BOT_TOKEN` |
-| Discord | `DISCORD_BOT_TOKEN` |
-| Slack | `SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN` |
-| Email | SMTP + IMAP credentials |
-| WhatsApp | External Baileys-style bridge endpoint configured via `bridge_url` |
-
-Configure in `~/.graphclaw/config.json` or via `install.sh`.
-
-### Safer Telegram / Discord defaults
-
-Telegram and Discord now default to a safer OpenClaw-style posture:
-
-- `dm_policy: "pairing"` — unknown DM senders get a one-time pairing code instead of immediate access
-- persistent DM approvals in `~/.graphclaw/credentials/<channel>-allowFrom.json`
-- persistent pending requests in `~/.graphclaw/credentials/<channel>-pairing.json`
-- `group_policy: "allowlist"` — groups stay blocked until explicitly allowlisted
-- group replies require a mention by default
-
-Example config:
+Example shape:
 
 ```json
 {
-  "channels": {
-    "telegram": {
+  "mcpServers": {
+    "filesystem": {
       "enabled": true,
-      "bot_token": "123:abc",
-      "owner_ids": ["123456789"],
-      "dm_policy": "pairing",
-      "allow_from": ["123456789"],
-      "group_policy": "allowlist",
-      "group_allow_from": ["123456789"],
-      "groups": {
-        "*": { "requireMention": true },
-        "-1001234567890": { "allow": true, "requireMention": false }
-      }
-    },
-    "discord": {
-      "enabled": true,
-      "bot_token": "discord-token",
-      "owner_ids": ["555555555555555555"],
-      "dm_policy": "pairing",
-      "group_policy": "allowlist",
-      "guilds": {
-        "123456789012345678": {
-          "channels": {
-            "*": { "allow": true, "requireMention": true },
-            "987654321098765432": { "allow": true, "requireMention": false }
-          }
-        }
-      }
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/root"]
     }
   }
 }
 ```
 
+At runtime Graphclaw can cache and expose:
+- server summaries
+- MCP tools
+- resources
+- prompts
+
+---
+
+## Channels
+
+| Channel | Notes |
+|---|---|
+| Telegram | pairing / allowlist aware |
+| Discord | pairing / allowlist aware |
+| Slack | bot + app token |
+| Email | IMAP / SMTP |
+| WhatsApp | bridge-based |
+
+Telegram and Discord default to safer OpenClaw-style posture:
+- pairing for unknown DMs
+- allowlist for groups
+- optional owner approvals
+
 Local approval commands:
-
-- `pairing list telegram`
-- `pairing approve telegram <code>`
-
-Troubleshooting:
-
-- First-time Telegram onboarding: open `https://t.me/<your_bot_username>`, press **Start**, then send any message.
-- If DMs return a pairing code, run `pairing list telegram` and `pairing approve telegram <code>` in the local Graphclaw terminal.
-- If group messages are ignored, add the group/channel to `groups` / `guilds`, or set `group_policy` to `"open"`.
-- If you also want in-chat approvals, set `channels.<provider>.owner_ids` (or `allow_from`) so an owner can issue `pairing approve <code>` from that channel.
+```text
+pairing list telegram
+pairing approve telegram <code>
+```
 
 ---
 
 ## Providers
 
-Default: **OpenRouter** — one API key, access to every major model.
+Default provider flow is built around **[OpenRouter](https://openrouter.ai/)**, but the config/provider registry supports the broader OpenAI-compatible ecosystem.
 
+Example:
 ```json
 {
   "providers": {
-    "openrouter": { "api_key": "sk-or-..." },
-    "anthropic":  { "api_key": "sk-ant-..." },
-    "openai":     { "api_key": "sk-..." },
-    "ollama":     { "base_url": "http://localhost:11434" }
+    "default_provider": "openrouter",
+    "openrouter": { "api_key": "sk-or-...", "base_url": "https://openrouter.ai/api/v1" },
+    "anthropic": { "api_key": "sk-ant-..." },
+    "openai": { "api_key": "sk-..." }
   },
   "agents": {
     "model": "openrouter/anthropic/claude-sonnet-4-6"
@@ -327,98 +303,83 @@ Default: **OpenRouter** — one API key, access to every major model.
 }
 ```
 
-Supported: OpenRouter, Anthropic, OpenAI, DeepSeek, Groq, Gemini, Mistral, Ollama, vLLM, Azure OpenAI, and any OpenAI-compatible endpoint.
-
 ---
 
 ## Configuration
 
-Full config at `~/.graphclaw/config.json`. Key fields:
-
-```json
-{
-  "workspace": "~/.graphclaw/workspace",
-  "multi_user": false,
-  "agents": {
-    "model": "openrouter/anthropic/claude-sonnet-4-6",
-    "max_tokens": 8192,
-    "temperature": 0.7,
-    "max_tool_iterations": 200,
-    "dream": {
-      "enabled": true,
-      "interval_hours": 2
-    }
-  },
-  "skills": {
-    "registry_url": "https://clawhub.ai/api/v1"
-  }
-}
+Main config lives at:
+```text
+~/.graphclaw/config.json
 ```
+
+Key sections:
+- `workspace`
+- `providers`
+- `agents`
+- `channels`
+- `skills`
+- `dashboard`
+- `mcpServers`
 
 ---
 
-## Multi-User Mode
+## Project structure
 
-`multi_user` and auth settings are present in config, but the hosted multi-user path should still be treated as **alpha scaffolding** rather than a fully production-ready auth/runtime layer.
-
-Run as an API server:
-```bash
-jac start graphclaw/main.jac
-```
-
----
-
-## Project Structure
-
-```
+```text
 graphclaw/
 ├── graphclaw/
-│   ├── main.jac              Entry point
-│   ├── config/               Config schema + loader
-│   ├── memory/               Graph schema, store, recall, consolidate, dream
-│   ├── agents/               Coordinator, DevOps, Planner, Builder, Researcher
-│   ├── channels/             Bus, Telegram, Discord, Slack, Email, WhatsApp
-│   ├── providers/            LLM provider abstraction + registry
-│   ├── tools/                Shell, filesystem, web search/fetch
-│   └── skills/
-│       ├── loader.py         Dynamic skill loading + online install
-│       └── registry/         Built-in skills (base44, loveable)
-├── install.sh                Setup wizard
-├── jac.toml                  Jac project config
-└── pyproject.toml            Python dependencies
+│   ├── main.jac
+│   ├── agents/
+│   ├── browser/
+│   ├── channels/
+│   ├── config/
+│   ├── dashboard.jac
+│   ├── dashboard_app/
+│   ├── mcp/
+│   ├── memory/
+│   ├── providers/
+│   ├── skills/
+│   └── tools/
+├── install.sh
+├── install.ps1
+├── jac.toml
+├── pyproject.toml
+└── README.md
 ```
 
 ---
 
 ## Built on
 
-- **[Jac / Jaseci](https://docs.jaseci.org/)** — AI-native full-stack language
-- **[byLLM](https://docs.jaseci.org/learn/jac-byllm/)** — Meaning Typed Programming (`by llm()`)
-- **[LiteLLM](https://github.com/BerriAI/litellm)** — multi-provider LLM routing
+- **[Jac](https://www.jac-lang.org/)**
+- **[Jaseci Docs](https://docs.jaseci.org/)**
+- **[LiteLLM](https://github.com/BerriAI/litellm)**
 - Inspired by **[nanobot](https://github.com/HKUDS/nanobot)** and **[openclaw](https://github.com/openclaw/openclaw)**
 
 ---
 
 ## Roadmap
 
-- [ ] CLI (`graphclaw run`, `graphclaw skill install`, `graphclaw memory`)
-- [x] ClawHub integration — 13,000+ public community skills available via `clawhub.ai`
-- [ ] More DevOps skills: Kubernetes, Docker, GitHub Actions, Vercel, Railway, AWS
-- [ ] Streaming output to channels
-- [ ] Web UI (Jac `cl {}` codespace — React frontend auto-generated)
-- [ ] `jac start --scale` Kubernetes deployment guide
+- [x] Jac-native local dashboard
+- [x] OpenClaw-style skills + ClawHub integration
+- [x] MCP runtime support
+- [x] Seeded root graph for identity / skills / MCP
+- [ ] richer graph visualization and live graph operations
+- [ ] more builder/platform skills
+- [ ] stronger hosted multi-user story
 
 ---
 
 ## Contributing
 
-Graphclaw is in alpha. PRs welcome — especially new skills in `graphclaw/skills/registry/`.
+Graphclaw is alpha and evolving fast. PRs are welcome.
 
-Each skill needs:
-- `skill.json` — manifest with `name`, `description`, `tools`, `requirements`
-- `skill.py` — async Python functions, one per tool
-
-See `graphclaw/skills/registry/base44/` as a reference.
+Good places to contribute:
+- new native skills
+- OpenClaw-style workflow skills
+- MCP integrations
+- dashboard improvements
+- graph-memory/runtime tooling
 
 ---
 
