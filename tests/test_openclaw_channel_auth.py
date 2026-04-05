@@ -1,12 +1,20 @@
 import asyncio
 import sys
 import types
+import importlib
 from pathlib import Path
 from types import SimpleNamespace
 
-from graphclaw.channels import auth as auth_mod
-from graphclaw.channels import discord as discord_mod
-from graphclaw.channels import telegram as telegram_mod
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+
+from graphclaw.channels import auth as _auth_mod
+from graphclaw.channels import discord as _discord_mod
+from graphclaw.channels import telegram as _telegram_mod
+
+auth_mod = importlib.reload(_auth_mod)
+discord_mod = importlib.reload(_discord_mod)
+telegram_mod = importlib.reload(_telegram_mod)
 
 
 class DummyQueue:
@@ -298,6 +306,52 @@ def test_auth_manager_persists_pending_and_approved_dm_state(monkeypatch, tmp_pa
     assert approved.metadata["auth_status"] == "approved"
 
 
+def test_startup_warnings_point_to_local_cli_when_no_owner_ids(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    manager = auth_mod.ChannelAuthManager(
+        "telegram",
+        {
+            "dm_policy": "pairing",
+            "allow_from": [],
+            "owner_ids": [],
+        },
+    )
+
+    warnings = manager.startup_warnings()
+
+    assert any("pairing approve telegram <code>" in warning for warning in warnings)
+    assert not any("No owner_ids are configured yet" in warning for warning in warnings)
+    assert not any("owner_ids (or allow_from)" in warning for warning in warnings)
+
+
+def test_pairing_prompt_prefers_local_cli_without_owner_ids(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    manager = auth_mod.ChannelAuthManager(
+        "telegram",
+        {
+            "dm_policy": "pairing",
+            "allow_from": [],
+            "owner_ids": [],
+        },
+    )
+
+    pending = manager.evaluate(
+        auth_mod.AuthEvent(
+            channel="telegram",
+            user_id="new-user",
+            chat_id="chat-7",
+            text="hello",
+            is_direct=True,
+        )
+    )
+
+    assert pending.allow_publish is False
+    assert any("pairing approve telegram" in response for response in pending.responses)
+    assert not any("No owner_ids are configured yet" in response for response in pending.responses)
+
+
 def test_telegram_allowlist_blocks_unlisted_sender(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path))
     cfg = SimpleNamespace(channels={"telegram": {"bot_token": "token", "allow_from": ["approved-user"]}})
@@ -395,3 +449,10 @@ def test_discord_guild_messages_default_to_safe_drop_without_allowlist_or_mentio
 
     assert fake_bus.inbound == []
     assert message.channel.sent_messages == []
+
+
+def test_main_jac_keeps_local_cli_available_when_channels_start():
+    main_jac = Path("graphclaw/main.jac").read_text(encoding="utf-8")
+
+    assert "interactive_cli_enabled = bool(sys.stdin and sys.stdin.isatty())" in main_jac
+    assert 'print("[graphclaw] local CLI enabled — use it for chat or pairing commands (Ctrl+C to exit):")' in main_jac
