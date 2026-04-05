@@ -9,6 +9,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
+from graphclaw import dashboard as dashboard_mod
 from graphclaw import dashboard_data
 from graphclaw import dashboard_runtime as _dashboard_runtime
 from graphclaw import dashboard_server
@@ -18,9 +19,10 @@ dashboard_runtime = importlib.reload(_dashboard_runtime)
 
 
 def test_dashboard_data_helpers_are_importable():
+    assert callable(dashboard_mod.dashboard_overview)
+    assert callable(dashboard_mod.dashboard_memory)
+    assert callable(dashboard_mod.dashboard_save_settings)
     assert callable(dashboard_data.dashboard_overview)
-    assert callable(dashboard_data.dashboard_memory)
-    assert callable(dashboard_data.dashboard_save_settings)
 
 
 def test_render_dashboard_html_contains_control_room(monkeypatch):
