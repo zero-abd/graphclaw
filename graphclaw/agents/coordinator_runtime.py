@@ -38,20 +38,33 @@ def _select_agent_class(query: str):
     return BaseAgent
 
 
+def _identity_prefix(assistant_name: str) -> str:
+    return (
+        f"You are {assistant_name}. Graphclaw is your underlying runtime/platform name, "
+        f"but when the user asks your name or addresses you directly, you should use {assistant_name}. "
+        "Honor user-provided naming preferences unless they ask you to change it again."
+    )
+
+
 async def run_coordinator(
     query: str,
     channel: str = "cli",
     chat_id: str = "local",
     user_id: str = "user",
     model: Optional[str] = None,
+    assistant_name: str = "Graphclaw",
 ) -> AgentResult:
     agent_cls = _select_agent_class(query)
     agent = agent_cls(query=query, channel=channel, chat_id=chat_id, user_id=user_id, model=model)
+    prefix = _identity_prefix(assistant_name)
     if isinstance(agent, BaseAgent) and agent_cls is BaseAgent:
         agent.system_prompt = (
-            "You are Graphclaw, a helpful multi-agent AI assistant. "
+            prefix + " " +
+            "You are a helpful multi-agent AI assistant. "
             "Answer directly and clearly. Use tools when helpful, and be honest about uncertainty."
         )
         agent.tools = [WebSearchTool(), WebFetchTool()]
+    else:
+        agent.system_prompt = prefix + " " + agent.system_prompt
     return await agent.run()
 

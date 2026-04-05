@@ -292,6 +292,46 @@ def tombstone_memory(memory_id: str) -> bool:
     return False
 
 
+
+
+def get_profile() -> Dict[str, Any]:
+    profile = _load_json(_profile_path(), {})
+    return profile if isinstance(profile, dict) else {}
+
+
+def get_assistant_name(default: str = "Graphclaw") -> str:
+    profile = get_profile()
+    name = str(profile.get("assistant_name", "")).strip()
+    return name or default
+
+
+def set_assistant_name(name: str) -> str:
+    cleaned = re.sub(r"\s+", " ", name).strip().strip("\"'")
+    cleaned = re.sub(r"[^A-Za-z0-9 _.-]", "", cleaned).strip()
+    if not cleaned:
+        raise ValueError("assistant name cannot be empty")
+    if len(cleaned) > 40:
+        cleaned = cleaned[:40].rstrip()
+    profile = get_profile()
+    profile.setdefault("created_at", _now())
+    profile["assistant_name"] = cleaned
+    _save_json(_profile_path(), profile)
+    return cleaned
+
+
+def extract_assistant_name_change(text: str) -> str | None:
+    patterns = [
+        r"(?:from now on[, ]*)?your name is ([A-Za-z0-9 _.-]{1,40})",
+        r"go by ([A-Za-z0-9 _.-]{1,40})",
+        r"i(?:'| a)?ll call you ([A-Za-z0-9 _.-]{1,40})",
+        r"call yourself ([A-Za-z0-9 _.-]{1,40})",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            return set_assistant_name(match.group(1))
+    return None
+
 def upsert_profile(display_name: str = "", timezone_name: str = "UTC", preferred_model: str = "") -> Dict[str, Any]:
     profile = _load_json(_profile_path(), {})
     if not isinstance(profile, dict):
