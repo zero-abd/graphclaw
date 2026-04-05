@@ -47,6 +47,13 @@ class SkillsConfig(BaseModel):
     installed_path: str = ""
 
 
+class DashboardConfig(BaseModel):
+    enabled: bool = True
+    auto_open: bool = True
+    host: str = "127.0.0.1"
+    port: int = 18789
+
+
 class Config(BaseModel):
     workspace: str = ""
     multi_user: bool = False
@@ -84,3 +91,4 @@ class Config(BaseModel):
     })
     auth: AuthConfig = Field(default_factory=AuthConfig)
     skills: SkillsConfig = Field(default_factory=SkillsConfig)
+    dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
