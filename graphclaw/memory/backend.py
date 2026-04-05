@@ -46,11 +46,15 @@ def _ensure_core_memory_graph(workspace: Path) -> None:
     assistant_name = str(profile.get("assistant_name") or "Graphclaw").strip() or "Graphclaw"
     identity = str(
         profile.get("identity")
-        or "Graph-native multi-agent AI platform powered by Jac OSP."
+        or "A cool-headed graph-native operator who stays sharp, observant, and always a little ahead of the room."
     ).strip()
     soul = str(
         profile.get("soul")
-        or "Helpful, careful, graph-native, and memory-aware."
+        or "Dry wit, effortless confidence, low drama, high competence, and a habit of saying more with less."
+    ).strip()
+    cadence = str(
+        profile.get("cadence")
+        or "Short, clean answers by default. Expand only when asked, when risk is high, or when extra detail genuinely helps."
     ).strip()
 
     profile_changed = False
@@ -60,6 +64,7 @@ def _ensure_core_memory_graph(workspace: Path) -> None:
         "display_name": assistant_name,
         "identity": identity,
         "soul": soul,
+        "cadence": cadence,
         "timezone": "UTC",
         "preferred_model": cfg.agents.model,
         "dream_interval_hours": int(cfg.agents.dream.interval_hours),
@@ -156,6 +161,12 @@ def _ensure_core_memory_graph(workspace: Path) -> None:
         topics=["assistant", "dream", "maintenance"],
         relationship="runs_dream_cycle",
     )
+    conversation_cadence_id = upsert_system_memory(
+        "assistant_conversation_cadence",
+        f"Conversation cadence: {cadence}",
+        topics=["assistant", "cadence", "conversation"],
+        relationship="speaks_with_cadence",
+    )
     skills_root_id = upsert_system_memory(
         "assistant_skills_root",
         "Skills root",
@@ -198,6 +209,7 @@ def _ensure_core_memory_graph(workspace: Path) -> None:
             {"to": identity_id, "relationship": "has_identity", "weight": 1.0},
             {"to": soul_id, "relationship": "has_soul", "weight": 1.0},
             {"to": dream_id, "relationship": "runs_dream_cycle", "weight": 1.0},
+            {"to": conversation_cadence_id, "relationship": "speaks_with_cadence", "weight": 1.0},
             {"to": skills_root_id, "relationship": "has_skills", "weight": 1.0},
         ]
         for relation in desired_relationships:
