@@ -59,3 +59,4 @@ def ensure_workspace() -> None:
     ws = Path(cfg.workspace)
     for sub in ["memory", "sessions", "skills/installed"]:
         (ws / sub).mkdir(parents=True, exist_ok=True)
+    (Path.home() / ".graphclaw" / "credentials").mkdir(parents=True, exist_ok=True)

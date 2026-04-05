@@ -28,6 +28,13 @@ class ChannelConfig(BaseModel):
     bot_token: str = ""
     app_token: str = ""  # slack only
     allowed_ids: List[str] = Field(default_factory=list)
+    allow_from: List[str] = Field(default_factory=list)
+    owner_ids: List[str] = Field(default_factory=list)
+    dm_policy: str = "pairing"
+    group_policy: str = "allowlist"
+    group_allow_from: List[str] = Field(default_factory=list)
+    groups: Dict[str, Any] = Field(default_factory=dict)
+    guilds: Dict[str, Any] = Field(default_factory=dict)
 
 
 class AuthConfig(BaseModel):
@@ -51,8 +58,26 @@ class Config(BaseModel):
         "openai": {"api_key": ""},
     })
     channels: Dict[str, Any] = Field(default_factory=lambda: {
-        "telegram": {"enabled": False, "bot_token": ""},
-        "discord": {"enabled": False, "bot_token": ""},
+        "telegram": {
+            "enabled": False,
+            "bot_token": "",
+            "dm_policy": "pairing",
+            "allow_from": [],
+            "owner_ids": [],
+            "group_policy": "allowlist",
+            "group_allow_from": [],
+            "groups": {},
+        },
+        "discord": {
+            "enabled": False,
+            "bot_token": "",
+            "dm_policy": "pairing",
+            "allow_from": [],
+            "owner_ids": [],
+            "group_policy": "allowlist",
+            "group_allow_from": [],
+            "guilds": {},
+        },
         "slack": {"enabled": False, "bot_token": "", "app_token": ""},
         "email": {"enabled": False},
         "whatsapp": {"enabled": False},
