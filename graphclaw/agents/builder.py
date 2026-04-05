@@ -6,6 +6,7 @@ from graphclaw.tools.platform_builders import builder_platform_tools
 from graphclaw.tools.shell import ShellTool
 from graphclaw.tools.web import WebSearchTool, WebFetchTool
 from graphclaw.config.loader import load_config
+from graphclaw.mcp.tooling import attach_mcp_runtime
 from graphclaw.skills.tooling import attach_skill_runtime
 
 
@@ -33,3 +34,4 @@ class BuilderAgent(BaseAgent):
             "If the user shares Loveable login credentials, save them with the credential tool before attempting browser-assisted screenshot progress."
         )
         attach_skill_runtime(self)
+        attach_mcp_runtime(self)

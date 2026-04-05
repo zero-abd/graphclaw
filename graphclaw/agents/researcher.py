@@ -1,6 +1,7 @@
 """Researcher agent — web research and knowledge synthesis."""
 from __future__ import annotations
 from graphclaw.agents.base import BaseAgent
+from graphclaw.mcp.tooling import attach_mcp_runtime
 from graphclaw.tools.web import WebSearchTool, WebFetchTool
 from graphclaw.skills.tooling import attach_skill_runtime
 
@@ -17,3 +18,4 @@ class ResearcherAgent(BaseAgent):
         super().__init__(**kwargs)
         self.tools = [WebSearchTool(), WebFetchTool()]
         attach_skill_runtime(self)
+        attach_mcp_runtime(self)
