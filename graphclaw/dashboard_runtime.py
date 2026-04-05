@@ -22,6 +22,10 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _dashboard_project_root() -> Path:
+    return Path(__file__).resolve().parent / "dashboard_app"
+
+
 def _graphclaw_home() -> Path:
     env = os.environ.get("GRAPHCLAW_HOME")
     if env:
@@ -164,7 +168,7 @@ def ensure_local_dashboard(open_browser: bool = True) -> str | None:
     ]
     proc = subprocess.Popen(
         cmd,
-        cwd=str(_repo_root()),
+        cwd=str(_dashboard_project_root()),
         env=env,
         stdout=log_handle,
         stderr=subprocess.STDOUT,
