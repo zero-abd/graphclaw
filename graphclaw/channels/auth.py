@@ -71,8 +71,9 @@ class ChannelAuthManager:
         ]
         if self.dm_policy == "pairing" and not self.owner_ids:
             warnings.append(
-                "pairing approvals need channels."
-                f"{self.channel}.owner_ids (or allow_from) so an owner can send 'pairing approve <code>'"
+                "pairing approvals are available from the local CLI with "
+                f"'pairing approve {self.channel} <code>'; set channels.{self.channel}.owner_ids "
+                "only if you also want in-chat approval commands"
             )
         if self.group_policy == "allowlist" and not self._has_any_group_allowlist():
             warnings.append(
@@ -147,11 +148,13 @@ class ChannelAuthManager:
             )
         request, was_created = pairing
         owner_hint = (
-            f"The owner can approve it by sending 'pairing approve {request['code']}' "
-            f"from an allowed {self.channel.title()} account or from the local CLI."
+            f"Approve it from the local CLI with 'pairing approve {self.channel} {request['code']}'."
         )
-        if not self.owner_ids:
-            owner_hint += f" No owner_ids are configured yet; set channels.{self.channel}.owner_ids first."
+        if self.owner_ids:
+            owner_hint += (
+                f" Owners can also send 'pairing approve {request['code']}' "
+                f"from an allowed {self.channel.title()} account."
+            )
         status_line = "Owner approval is required before we can chat here."
         if not was_created:
             status_line = "Your earlier pairing request is still pending approval."
