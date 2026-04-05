@@ -37,6 +37,13 @@ else
     OK_ICON="OK"; WARN_ICON="!"; FAIL_ICON="X"; ASK_ICON="?"
 fi
 
+INPUT_FD=0
+if [ ! -t 0 ]; then
+    if exec 3</dev/tty 2>/dev/null; then
+        INPUT_FD=3
+    fi
+fi
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 step_n=0; total_steps=6
 rule() {
@@ -75,16 +82,16 @@ choice_card() {
 
 ask_optional() {
     REPLY=""
-    echo -ne "  ${C}?${NC} ${BOLD}$1${NC} ${D}(optional, Enter to skip)${NC}: "
-    if ! read -r REPLY; then
+    printf "  %b%s%b %b%s%b %b(optional, Enter to skip)%b: " "$C" "$ASK_ICON" "$NC" "$BOLD" "$1" "$NC" "$D" "$NC"
+    if ! read -r -u "$INPUT_FD" REPLY; then
         REPLY=""
     fi
 }
 ask_required() {
     REPLY=""
     while true; do
-        echo -ne "  ${C}?${NC} ${BOLD}$1${NC}: "
-        if ! read -r REPLY; then
+        printf "  %b%s%b %b%s%b: " "$C" "$ASK_ICON" "$NC" "$BOLD" "$1" "$NC"
+        if ! read -r -u "$INPUT_FD" REPLY; then
             fail "Input aborted."
         fi
         [ -n "$REPLY" ] && return
@@ -96,8 +103,8 @@ ask_choice() {
     local answer=""
     REPLY="$default"
     while true; do
-        echo -ne "  ${C}?${NC} ${BOLD}$prompt${NC} ${D}[default: ${default}]${NC}: "
-        if ! read -r answer; then
+        printf "  %b%s%b %b%s%b %b[default: %s]%b: " "$C" "$ASK_ICON" "$NC" "$BOLD" "$prompt" "$NC" "$D" "$default" "$NC"
+        if ! read -r -u "$INPUT_FD" answer; then
             fail "Input aborted."
         fi
         REPLY="${answer:-$default}"
