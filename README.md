@@ -14,6 +14,8 @@
 
 Inspired by [nanobot](https://github.com/HKUDS/nanobot) and [openclaw](https://github.com/openclaw/openclaw). Graphclaw replaces the flat-file memory model with a live, decaying, self-maintaining graph — and adds a coordinator that routes tasks across a team of specialist agents.
 
+Work In Progress for Full OpwnClaw Implementation
+
 ---
 
 ## Why Graphclaw
