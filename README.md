@@ -1,3 +1,5 @@
+
+
 <div align="center">
   <h1>⚡ Graphclaw</h1>
   <p><strong>Graph-native AI assistant runtime in Jac</strong></p>
@@ -20,7 +22,7 @@ Inspired by **[nanobot](https://github.com/HKUDS/nanobot)** and **[openclaw](htt
 ## Install
 
 **Requirements:**
-- **[Python 3.12+](https://docs.python.org/3.12/)**
+- **[Python 3.12 or 3.13](https://docs.python.org/3.12/)**
 - **[Git](https://git-scm.com/)**
 
 **Linux / macOS / WSL:**
