@@ -10,6 +10,9 @@ requires-python = ">=3.12,<3.14"
 dependencies = [
     "jaclang>=0.13.5,<0.14",
     "jac-client>=0.3.11",
+    # llvmlite 0.48 dropped size_level from create_pipeline_tuning_options,
+    # which jaclang 0.13.5 native compilation still passes (breaks the dashboard).
+    "llvmlite>=0.43,<0.48",
     "byllm>=0.2.0",
     "litellm>=1.40.0",
     "mcp[cli]>=1.12.0",
