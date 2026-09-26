@@ -9,6 +9,8 @@
   </p>
 </div>
 
+**Project site and self-host guide:** https://graphclaw.vercel.app
+
 <img width="1424" height="751" alt="image" src="https://github.com/user-attachments/assets/c7dade1a-b256-45d0-939c-b9fca999f2fe" />
 
 **Graphclaw** is a graph-native AI assistant runtime where memory is stored as a live knowledge graph, tools are exposed through Jac and Python, and skills plus MCP servers can be attached at runtime. It is written in **[Jac](https://www.jac-lang.org/)** and runs on top of the current Jaseci/Jac toolchain.
