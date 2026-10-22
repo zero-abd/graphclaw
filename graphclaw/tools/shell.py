@@ -1,6 +1,8 @@
 """Shell command execution tool."""
 from __future__ import annotations
 import asyncio
+import os
+import signal
 import subprocess
 from typing import Any
 
@@ -24,12 +26,15 @@ class ShellTool:
         command = kwargs["command"]
         timeout = kwargs.get("timeout", 120)
 
+        proc = None
         try:
             proc = await asyncio.create_subprocess_shell(
                 command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=self.workspace or None,
+                # Own process group, so a timeout can kill the command's children too
+                start_new_session=os.name != "nt",
             )
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
             out = stdout.decode("utf-8", errors="replace") if stdout else ""
@@ -52,6 +57,16 @@ class ShellTool:
 
             return result or "(no output)"
         except asyncio.TimeoutError:
+            # Kill the timed-out process so it doesn't keep running orphaned
+            if proc is not None and proc.returncode is None:
+                try:
+                    if os.name != "nt":
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    else:
+                        proc.kill()
+                except ProcessLookupError:
+                    pass
+                await proc.wait()
             return f"Error: command timed out after {timeout}s"
         except Exception as e:
             return f"Error executing command: {e}"
